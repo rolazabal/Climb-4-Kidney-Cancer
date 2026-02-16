@@ -38,7 +38,7 @@ async def create_mountain(conn, name, height, location, description = None, imag
 async def update_mountain(conn, mountain_uuid: str, name=None, height=None, location=None, description=None, image_url=None):
     element_updates = {}
     if name is not None:
-        updates["name"] = name
+        element_updates["name"] = name
     if height is not None:
         element_updates["height"] = height
     if location is not None:
