@@ -22,8 +22,6 @@ class Mountain(BaseModel):
 # DB Functions (CRUD)
 # --------------------
 
-#def generate_uuid():
-
 
 #async def get_connection():
 	
@@ -121,3 +119,14 @@ async def get_mountains():
     async with app.state.pool.acquire() as conn:
         mountains = await list_mountains(conn)
     return mountains
+
+# Returns id, name of all mountains
+@app.delete("/mountains/{mountain_id}")
+async def delete_mountain(mountain_id: str):
+    async with app.state.pool.acquire() as conn:
+        result = await delete_mountain(conn, mountain_id)
+
+    if not result:
+        raise HTTPException(404, "Mountain not found")
+
+    return dict(result)
