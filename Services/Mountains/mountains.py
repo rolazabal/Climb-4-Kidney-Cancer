@@ -46,7 +46,11 @@ async def read_mountain(conn, mountain_id: str):
     )
     return row
 
-#def list_mountains():
+async def list_mountains(conn):
+    rows = await conn.fetch("""
+        SELECT id, name FROM mountains
+    """)
+    return [dict(row) for row in rows]
 
 
 # --------------
@@ -76,7 +80,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # shutdown
-    await app.state.conn.close()
+    await app.state.pool.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -101,3 +105,10 @@ async def get_mountain(mountain_id: str):
         raise HTTPException(404, "Mountain not found")
 
     return dict(result)
+
+# Returns id, name of all mountains
+@app.get("/mountains")
+async def get_mountains():
+    async with app.state.pool.acquire() as conn:
+        mountains = await list_mountains(conn)
+    return mountains
