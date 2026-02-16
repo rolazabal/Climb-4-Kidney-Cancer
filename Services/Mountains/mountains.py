@@ -1,20 +1,34 @@
+# IMPORTS
 # type "fastapi dev mountains.py" in console to run
 import asyncpg
 import asyncio
+import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException
 from pydantic import BaseModel
 
 
+# SCHEMA
+class Mountain(BaseModel):
+    name: str
+    height: float
+    location: str
+    description: str | None = None
+    url: str | None = None
 
-# database functions
+
+
+# --------------------
+# DB Functions (CRUD)
+# --------------------
+
 #def generate_uuid():
 #async def get_connection():
 	
 
-
 async def create_mountain(conn, name, height, location, description = None, image_url = None):
-	uuid = "2"#generate_uuid()
+	new_id = str(uuid.uuid4()) # generating ID
+ 
 	await conn.execute('''
 		INSERT INTO mountains(uuid, name, height, location, description, image_url) VALUES($1, $2, $3, $4, $5, $6)
 	''', uuid, name, height, location, description, image_url)
@@ -25,59 +39,26 @@ async def create_mountain(conn, name, height, location, description = None, imag
 
 #def delete_mountain():
 
-async def read_mountain(uuid):
-	result = await conn.fetchrow('''
-		SELECT * FROM mountains WHERE uuid = $1
-	''', uuid)
-	return result
+async def read_mountain(conn, mountain_id: str):
+    row = await conn.fetchrow(
+        "SELECT * FROM mountains WHERE id=$1",
+        mountain_id
+    )
+    return row
 
 #def list_mountains():
 
 
+# --------------
+# LIFESPAN 
+# --------------
 
-# API
-app = FastAPI()
+DBurl = "postgresql://postgres:admin@localhost/mountains_service"
 
-class Mountain(BaseModel):
-    id: str
-    name: str
-    height: float
-    location: str
-    description: str
-    url: str
-
-@app.get("/")
-def hello_world():
-    return {"message": "Hello world."}
-
-	
-
-
-@app.on_event("startup")
-async def startup():
-    app.state.conn = await asyncpg.connect(
-        "postgresql://postgres:admin@localhost/mountains_service"
-    )
-
-    await app.state.conn.execute("""
-        CREATE TABLE IF NOT EXISTS mountains(
-            uuid text PRIMARY KEY,
-            name text NOT NULL,
-            height real NOT NULL,
-            location text NOT NULL,
-            description text,
-            image_url text
-        )
-    """
-    
-    print(await create_mountain(conn, "name", 3, "location"))
-    
-    )
-    
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    app.state.conn = await asyncpg.connect(
+    app.state.pool = await asyncpg.create_pool(
         "postgresql://postgres:admin@localhost/mountains_service"
     )
 
@@ -99,3 +80,24 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# ----------
+# ROUTES
+# ----------
+@app.post("/mountains")
+async def add_mountain(mountain: Mountain):
+    async with app.state.pool.acquire() as conn:
+        new_id = await create_mountain(conn, mountain)
+    return {"id": new_id}
+
+
+@app.get("/mountains/{mountain_id}")
+async def get_mountain(mountain_id: str):
+    async with app.state.pool.acquire() as conn:
+        result = await read_mountain(conn, mountain_id)
+
+    if not result:
+        raise HTTPException(404, "Mountain not found")
+
+    return dict(result)
