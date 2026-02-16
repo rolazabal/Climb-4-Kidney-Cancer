@@ -1,6 +1,7 @@
 # type "fastapi dev mountains.py" in console to run
 import asyncpg
 import asyncio
+import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException
 from pydantic import BaseModel
@@ -23,7 +24,12 @@ async def create_mountain(conn, name, height, location, description = None, imag
 #def update_mountain(uuid, name = None, height = None, location = None, description = None, image_url = None):
 	# 
 
-#def delete_mountain():
+async def delete_mountain(conn, uuid):
+    await conn.execute('''
+        DELETE FROM mountains WHERE uuid = $1
+    ''', uuid)
+
+    return "Deleteing mountain sucessful " + uuid
 
 async def read_mountain(uuid):
 	result = await conn.fetchrow('''
@@ -94,3 +100,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+async def get_conn():
+    async with app.state.pool.acquire() as conn:
+        yield conn
