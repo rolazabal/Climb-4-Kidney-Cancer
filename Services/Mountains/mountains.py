@@ -4,8 +4,9 @@ import asyncpg
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
 
 
 # SCHEMA
@@ -31,24 +32,44 @@ async def create_mountain(conn, name, height, location, description = None, imag
  
 	await conn.execute('''
 		INSERT INTO mountains(uuid, name, height, location, description, image_url) VALUES($1, $2, $3, $4, $5, $6)
-	''', uuid, name, height, location, description, image_url)
-	return uuid
+	''', new_id, name, height, location, description, image_url)
+	return new_id
 
-#def update_mountain(uuid, name = None, height = None, location = None, description = None, image_url = None):
-	# 
+async def update_mountain(conn, mountain_uuid: str, name=None, height=None, location=None, description=None, image_url=None):
+    element_updates = {}
+    if name is not None:
+        updates["name"] = name
+    if height is not None:
+        element_updates["height"] = height
+    if location is not None:
+        element_updates["location"] = location
+    if description is not None:
+        element_updates["description"] = description
+    if image_url is not None:
+        element_updates["image_url"] = image_url
+    if not element_updates:
+        return "UPDATE 0"  # or raise ValueError / HTTPException
+
+    set_clause = ", ".join(
+        f"{col} = ${i}" for i, col in enumerate(element_updates.keys(), start=1)
+    )
+    query = f"UPDATE mountains SET {set_clause} WHERE uuid = ${len(element_updates) + 1}"
+
+    values = list(element_updates.values()) + [mountain_uuid]
+    return await conn.execute(query, *values)
 
 #def delete_mountain():
 
 async def read_mountain(conn, mountain_id: str):
     row = await conn.fetchrow(
-        "SELECT * FROM mountains WHERE id=$1",
+        "SELECT * FROM mountains WHERE uuid=$1",
         mountain_id
     )
     return row
 
 async def list_mountains(conn):
     rows = await conn.fetch("""
-        SELECT id, name FROM mountains
+        SELECT uuid, name FROM mountains
     """)
     return [dict(row) for row in rows]
 
@@ -65,15 +86,15 @@ async def lifespan(app: FastAPI):
     app.state.pool = await asyncpg.create_pool(
         "postgresql://postgres:admin@localhost/mountains_service"
     )
-
-    await app.state.conn.execute("""
-        CREATE TABLE IF NOT EXISTS mountains(
-            uuid text PRIMARY KEY,
-            name text NOT NULL,
-            height real NOT NULL,
-            location text NOT NULL,
-            description text,
-            image_url text
+    async with app.state.pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS mountains(
+                uuid text PRIMARY KEY,
+                name text NOT NULL,
+                height real NOT NULL,
+                location text NOT NULL,
+                description text,
+                image_url text
         )
     """)
 
@@ -112,3 +133,17 @@ async def get_mountains():
     async with app.state.pool.acquire() as conn:
         mountains = await list_mountains(conn)
     return mountains
+
+@app.patch("/mountains/{mountain_id}")
+async def patch_mountain(mountain_id: str, patch: dict = Body(...)):
+    allowed = {"name", "height", "location", "description", "url"}
+    data = {k: v for k, v in patch.items() if k in allowed and v is not None}
+    if "url" in data:
+        data["image_url"] = data.pop("url")
+
+    async with app.state.pool.acquire() as conn:
+        result = await update_mountain(conn, mountain_id, **data)
+
+    if result.endswith("0"):
+        raise HTTPException(404, "Mountain not found")
+    return {"message": "Mountain updated"}
