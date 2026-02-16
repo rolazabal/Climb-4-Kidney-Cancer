@@ -45,34 +45,29 @@ class Mountain(BaseModel):
     location: str
     description: str
     url: str
-
-@app.get("/")
-def hello_world():
-    return {"message": "Hello world."}
-
 	
 
 
-@app.on_event("startup")
-async def startup():
-    app.state.conn = await asyncpg.connect(
-        "postgresql://postgres:admin@localhost/mountains_service"
-    )
+# @app.on_event("startup")
+# async def startup():
+#     app.state.conn = await asyncpg.connect(
+#         "postgresql://postgres:admin@localhost/mountains_service"
+#     )
 
-    await app.state.conn.execute("""
-        CREATE TABLE IF NOT EXISTS mountains(
-            uuid text PRIMARY KEY,
-            name text NOT NULL,
-            height real NOT NULL,
-            location text NOT NULL,
-            description text,
-            image_url text
-        )
-    """
+#     await app.state.conn.execute("""
+#         CREATE TABLE IF NOT EXISTS mountains(
+#             uuid text PRIMARY KEY,
+#             name text NOT NULL,
+#             height real NOT NULL,
+#             location text NOT NULL,
+#             description text,
+#             image_url text
+#         )
+#     """
     
-    print(await create_mountain(conn, "name", 3, "location"))
+#     print(await create_mountain(conn, "name", 3, "location"))
     
-    )
+#     )
     
 @asynccontextmanager
 async def lifespan(app: FastAPI):
