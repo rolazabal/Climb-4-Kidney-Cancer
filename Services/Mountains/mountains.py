@@ -1,19 +1,15 @@
 # type "fastapi dev mountains.py" in console to run
 import asyncpg
 import asyncio
-import contextlib import asynccontextmanager
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, HTTPException
 from pydantic import BaseModel
 
-# DB CONNECTION
-
-
-# Defining the table
 
 
 # database functions
 #def generate_uuid():
-async def get_connection():
+#async def get_connection():
 	
 
 
@@ -54,21 +50,52 @@ class Mountain(BaseModel):
 def hello_world():
     return {"message": "Hello world."}
 
+	
 
-async def main():
-	conn = await asyncpg.connect('postgresql://postgres:admin@localhost/mountains_service')
 
-	await conn.execute('''
-		CREATE TABLE IF NOT EXISTS mountains(
-			uuid text PRIMARY KEY,
-			name text NOT NULL,
-			height real NOT NULL,
-			location text NOT NULL,
-			description text,
-			image_url text
-		)
-	''')
+@app.on_event("startup")
+async def startup():
+    app.state.conn = await asyncpg.connect(
+        "postgresql://postgres:admin@localhost/mountains_service"
+    )
 
-	print(await create_mountain(conn, "name", 3, "location"))
+    await app.state.conn.execute("""
+        CREATE TABLE IF NOT EXISTS mountains(
+            uuid text PRIMARY KEY,
+            name text NOT NULL,
+            height real NOT NULL,
+            location text NOT NULL,
+            description text,
+            image_url text
+        )
+    """
+    
+    print(await create_mountain(conn, "name", 3, "location"))
+    
+    )
+    
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    app.state.conn = await asyncpg.connect(
+        "postgresql://postgres:admin@localhost/mountains_service"
+    )
 
-asyncio.run(main())
+    await app.state.conn.execute("""
+        CREATE TABLE IF NOT EXISTS mountains(
+            uuid text PRIMARY KEY,
+            name text NOT NULL,
+            height real NOT NULL,
+            location text NOT NULL,
+            description text,
+            image_url text
+        )
+    """)
+
+    yield
+
+    # shutdown
+    await app.state.conn.close()
+
+
+app = FastAPI(lifespan=lifespan)
