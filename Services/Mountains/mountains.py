@@ -95,14 +95,12 @@ async def list_mountains(conn):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost/mountains_service"
+DBurl = "postgresql://summit_admin:admin0415@localhost:5432/mountains_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    app.state.pool = await asyncpg.create_pool(
-        "postgresql://postgres:admin@localhost/mountains_service"
-    )
+    app.state.pool = await asyncpg.create_pool(DBurl)
     async with app.state.pool.acquire() as conn:
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS mountains(
