@@ -4,7 +4,7 @@ import asyncpg
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
 
 
@@ -38,7 +38,7 @@ async def create_mountain(conn, name, height, location, description = None, imag
 async def update_mountain(conn, mountain_uuid: str, name=None, height=None, location=None, description=None, image_url=None):
     element_updates = {}
     if name is not None:
-        updates["name"] = name
+        element_updates["name"] = name
     if height is not None:
         element_updates["height"] = height
     if location is not None:
@@ -113,7 +113,15 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/mountains")
 async def add_mountain(mountain: Mountain):
     async with app.state.pool.acquire() as conn:
-        new_id = await create_mountain(conn, mountain)
+        new_id = await create_mountain(
+            conn,
+            mountain.name,
+            mountain.height,
+            mountain.location,
+            mountain.description,
+            mountain.url
+            )
+        
     return {"id": new_id}
 
 
