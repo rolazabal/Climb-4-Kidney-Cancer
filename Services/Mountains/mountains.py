@@ -4,7 +4,7 @@ import asyncpg
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
 
 
@@ -23,17 +23,25 @@ class Mountain(BaseModel):
 # DB Functions (CRUD)
 # --------------------
 
-#def generate_uuid():
+# simple uid generator
+_next_uid = 0
+
+def generate_uid():
+    global _next_uid
+    _next_uid += 1
+    return _next_uid
+
 #async def get_connection():
 	
 
 async def create_mountain(conn, name, height, location, description = None, image_url = None):
-	new_id = str(uuid.uuid4()) # generating ID
+	new_id = str(generate_uid()) # generating ID
  
 	await conn.execute('''
 		INSERT INTO mountains(uuid, name, height, location, description, image_url) VALUES($1, $2, $3, $4, $5, $6)
 	''', new_id, name, height, location, description, image_url)
 	return new_id
+
 
 async def update_mountain(conn, mountain_uuid: str, name=None, height=None, location=None, description=None, image_url=None):
     element_updates = {}
@@ -58,7 +66,15 @@ async def update_mountain(conn, mountain_uuid: str, name=None, height=None, loca
     values = list(element_updates.values()) + [mountain_uuid]
     return await conn.execute(query, *values)
 
-#def delete_mountain():
+
+# "DELETE 1" or "DELETE 0"
+async def delete_mountain(conn, mountain_id: str):
+    row = await conn.fetchrow(
+        "DELETE FROM mountains WHERE uuid=$1",
+        mountain_id
+    )
+    return row
+
 
 async def read_mountain(conn, mountain_id: str):
     row = await conn.fetchrow(
@@ -66,6 +82,7 @@ async def read_mountain(conn, mountain_id: str):
         mountain_id
     )
     return row
+
 
 async def list_mountains(conn):
     rows = await conn.fetch("""
@@ -113,10 +130,18 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/mountains")
 async def add_mountain(mountain: Mountain):
     async with app.state.pool.acquire() as conn:
-        new_id = await create_mountain(conn, mountain)
+        new_id = await create_mountain(
+            conn,
+            mountain.name,
+            mountain.height,
+            mountain.location,
+            mountain.description,
+            mountain.url
+            )
+        
     return {"id": new_id}
 
-
+# get mountain by id
 @app.get("/mountains/{mountain_id}")
 async def get_mountain(mountain_id: str):
     async with app.state.pool.acquire() as conn:
@@ -134,6 +159,18 @@ async def get_mountains():
         mountains = await list_mountains(conn)
     return mountains
 
+# delete mountain entry
+@app.delete("/mountains/{mountain_id}")
+async def delete_mountain(mountain_id: str):
+    async with app.state.pool.acquire() as conn:
+        result = await delete_mountain(conn, mountain_id)
+
+    if not result:
+        raise HTTPException(404, "Mountain not found")
+
+    return dict(result)
+
+# update mountain entry
 @app.patch("/mountains/{mountain_id}")
 async def patch_mountain(mountain_id: str, patch: dict = Body(...)):
     allowed = {"name", "height", "location", "description", "url"}
