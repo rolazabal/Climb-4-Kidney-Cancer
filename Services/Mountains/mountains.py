@@ -68,8 +68,8 @@ async def update_mountain(conn, mountain_uuid: str, name=None, height=None, loca
 
 
 # "DELETE 1" or "DELETE 0"
-async def delete_mountain(conn, mountain_id: str):
-    row = await conn.fetchrow(
+async def delete_mountain_db(conn, mountain_id: str):
+    row = await conn.execute(
         "DELETE FROM mountains WHERE uuid=$1",
         mountain_id
     )
@@ -163,12 +163,12 @@ async def get_mountains():
 @app.delete("/mountains/{mountain_id}")
 async def delete_mountain(mountain_id: str):
     async with app.state.pool.acquire() as conn:
-        result = await delete_mountain(conn, mountain_id)
+        result = await delete_mountain_db(conn, mountain_id)
 
-    if not result:
+    if result.endswith("0"):
         raise HTTPException(404, "Mountain not found")
 
-    return dict(result)
+    return {"message": "Mountain deleted"}
 
 # update mountain entry
 @app.patch("/mountains/{mountain_id}")
