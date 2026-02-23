@@ -1,20 +1,198 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from "@/constants/theme";
 
-function mountains() {
+const c = Colors.light;
 
-    return (
-        <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-                <Text style={styles.pageTitle}>Mountains</Text>
-                <Text style={styles.pageSubtitle}>Your climbing journey</Text>
-        </ScrollView>
+type Mountain = {
+  id: string;
+  name: string;
+  range: string;
+  elevationFt: number;
+};
+
+type InProgressMountain = Mountain & {
+  progressFt: number;
+  isPaused: boolean;
+};
+
+const initialAvailableMountains: Mountain[] = [
+  { id: "bierstadt", name: "Mt. Bierstadt", range: "Colorado, USA", elevationFt: 14066 },
+  { id: "lobuche", name: "Lobuche Peak", range: "Khumbu, Nepal", elevationFt: 20075 },
+  { id: "rainier", name: "Mt. Rainier", range: "Washington, USA", elevationFt: 14411 },
+  { id: "aconcagua", name: "Aconcagua", range: "Mendoza, Argentina", elevationFt: 22838 },
+];
+
+const initialInProgressMountains: InProgressMountain[] = [
+  {
+    id: "elbert",
+    name: "Mt. Elbert",
+    range: "Colorado, USA",
+    elevationFt: 14440,
+    progressFt: 4520,
+    isPaused: false,
+  },
+];
+
+function MountainsPage() {
+  const [isSelectingMountain, setIsSelectingMountain] = useState(false);
+  const [availableMountains, setAvailableMountains] = useState(initialAvailableMountains);
+  const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
+  const [currentClimbingMountainId, setCurrentClimbingMountainId] = useState<string | null>(
+    initialInProgressMountains.find((mountain) => !mountain.isPaused)?.id ?? null
+  );
+  const currentClimbingMountain =
+    inProgressMountains.find((mountain) => mountain.id === currentClimbingMountainId) ?? null;
+
+  const sortedInProgress = useMemo(
+    () => [...inProgressMountains].sort((a, b) => b.progressFt / b.elevationFt - a.progressFt / a.elevationFt),
+    [inProgressMountains]
+  );
+
+  const startClimb = (mountain: Mountain) => {
+    setAvailableMountains((current) => current.filter((item) => item.id !== mountain.id));
+    setInProgressMountains((current) => [
+      ...current.map((item) => ({ ...item, isPaused: true })),
+      { ...mountain, progressFt: 0, isPaused: false },
+    ]);
+    setCurrentClimbingMountainId(mountain.id);
+    setIsSelectingMountain(false);
+  };
+
+  const togglePause = (mountainId: string) => {
+    const targetMountain = inProgressMountains.find((mountain) => mountain.id === mountainId);
+    if (!targetMountain) {
+      return;
+    }
+
+    if (targetMountain.isPaused) {
+      setInProgressMountains((current) =>
+        current.map((mountain) =>
+          mountain.id === mountainId ? { ...mountain, isPaused: false } : { ...mountain, isPaused: true }
+        )
+      );
+      setCurrentClimbingMountainId(mountainId);
+      return;
+    }
+
+    setInProgressMountains((current) =>
+      current.map((mountain) => (mountain.id === mountainId ? { ...mountain, isPaused: true } : mountain))
     );
+    if (currentClimbingMountainId === mountainId) {
+      setCurrentClimbingMountainId(null);
+    }
+  };
+
+  const quitClimb = (mountainId: string) => {
+    setInProgressMountains((current) => {
+      const mountainToQuit = current.find((mountain) => mountain.id === mountainId);
+      if (!mountainToQuit) {
+        return current;
+      }
+
+      setAvailableMountains((available) => {
+        if (available.some((mountain) => mountain.id === mountainToQuit.id)) {
+          return available;
+        }
+        return [...available, mountainToQuit];
+      });
+
+      return current.filter((mountain) => mountain.id !== mountainId);
+    });
+    if (currentClimbingMountainId === mountainId) {
+      setCurrentClimbingMountainId(null);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.screen} edges={["top"]}>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        <Text style={styles.pageTitle}>Mountains</Text>
+        <Text style={styles.pageSubtitle}>Track climbs in progress and start new routes.</Text>
+
+        <Pressable style={styles.startButton} onPress={() => setIsSelectingMountain((current) => !current)}>
+          <Text style={styles.startButtonText}>
+            {isSelectingMountain ? "Done Selecting" : "Start New Climb"}
+          </Text>
+        </Pressable>
+        {currentClimbingMountain ? (
+          <Text style={styles.singleActiveHint}>
+            Currently climbing: {currentClimbingMountain.name}. Starting or resuming another climb pauses all others.
+          </Text>
+        ) : (
+          <Text style={styles.singleActiveHint}>No active climb right now.</Text>
+        )}
+
+        {isSelectingMountain ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Not Started</Text>
+            {availableMountains.length === 0 ? (
+              <Text style={styles.emptyStateText}>No mountains left to start right now.</Text>
+            ) : (
+              availableMountains.map((mountain) => (
+                <View key={mountain.id} style={styles.card}>
+                  <View>
+                    <Text style={styles.cardTitle}>{mountain.name}</Text>
+                    <Text style={styles.cardSubtitle}>{mountain.range}</Text>
+                    <Text style={styles.cardMeta}>Elevation: {mountain.elevationFt.toLocaleString()} ft</Text>
+                  </View>
+                  <Pressable
+                    style={styles.cardPrimaryButton}
+                    onPress={() => startClimb(mountain)}
+                  >
+                    <Text style={styles.cardPrimaryButtonText}>Start Climb</Text>
+                  </Pressable>
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>In Progress</Text>
+          {sortedInProgress.length === 0 ? (
+            <Text style={styles.emptyStateText}>No climbs in progress.</Text>
+          ) : (
+            sortedInProgress.map((mountain) => {
+              const progressRatio = Math.min(mountain.progressFt / mountain.elevationFt, 1);
+              const progressPct = Math.round(progressRatio * 100);
+              return (
+                <View key={mountain.id} style={styles.card}>
+                  <Text style={styles.cardTitle}>{mountain.name}</Text>
+                  <Text style={styles.cardSubtitle}>{mountain.range}</Text>
+                  <Text style={styles.cardMeta}>
+                    {mountain.progressFt.toLocaleString()} / {mountain.elevationFt.toLocaleString()} ft ({progressPct}
+                    %)
+                  </Text>
+
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+                  </View>
+
+                  <View style={styles.actionsRow}>
+                    <Pressable style={styles.cardSecondaryButton} onPress={() => togglePause(mountain.id)}>
+                      <Text style={styles.cardSecondaryButtonText}>
+                        {mountain.isPaused ? "Resume Climb" : "Pause Climb"}
+                      </Text>
+                    </Pressable>
+                    <Pressable style={styles.cardDangerButton} onPress={() => quitClimb(mountain.id)}>
+                      <Text style={styles.cardDangerButtonText}>Quit Climb</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#ECEDEE",
+    backgroundColor: c.background,
   },
   content: {
     padding: 16,
@@ -23,162 +201,127 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 44,
     fontWeight: "700",
-    color: "#2F2F2F",
+    color: c.heading,
     marginBottom: 2,
   },
   pageSubtitle: {
-    fontSize: 24,
-    color: "#666666",
-    marginBottom: 14,
+    fontSize: 18,
+    color: c.subtitle,
+    marginBottom: 16,
   },
-  profileCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#0E1A18",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+  startButton: {
+    backgroundColor: c.tint,
+    borderRadius: 14,
+    minHeight: 56,
+    justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
-    paddingBottom: 18,
   },
-  banner: {
-    height: 112,
-    width: "100%",
-    backgroundColor: "#4D4D4D",
-  },
-  avatar: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: "#C76341",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: -46,
-    borderWidth: 4,
-    borderColor: "#F5F5F5",
-    marginBottom: 10,
-  },
-  username: {
-    fontSize: 20,
+  startButtonText: {
+    color: c.onPrimary,
+    fontSize: 18,
     fontWeight: "700",
-    color: "#4A4A4A",
-    marginBottom: 4,
   },
-  email: {
+  singleActiveHint: {
+    marginBottom: 14,
+    color: c.subtitle,
     fontSize: 14,
-    color: "#8A8A8A",
-    marginBottom: 12,
   },
-  streakGrid: {
-    width: "100%",
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 16,
-  },
-  streakCard: {
-    flex: 1,
-    borderRadius: 10,
-    padding: 12,
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
-  streakCardWarm: {
-    backgroundColor: "#EFE8E1",
-  },
-  streakCardCool: {
-    backgroundColor: "#F1F2F4",
-  },
-  streakValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#333333",
-    lineHeight: 22,
-  },
-  streakLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6E6E6E",
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 10,
+  section: {
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700",
-    color: "#2F2F2F",
+    color: c.heading,
+    marginBottom: 12,
   },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 12,
-    marginBottom: 18,
-  },
-  statCard: {
-    width: "48.5%",
-    backgroundColor: "#FFFFFF",
+  card: {
+    backgroundColor: c.surface,
     borderRadius: 14,
-    paddingVertical: 20,
-    alignItems: "center",
-    shadowColor: "#0E1A18",
+    padding: 14,
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
+    marginBottom: 12,
   },
-  statValue: {
-    marginTop: 6,
-    fontSize: 40,
+  cardTitle: {
+    fontSize: 20,
     fontWeight: "700",
-    color: "#303030",
+    color: c.heading,
   },
-  statLabel: {
-    marginTop: 4,
+  cardSubtitle: {
+    fontSize: 15,
+    color: c.subtitle,
+    marginTop: 2,
+  },
+  cardMeta: {
     fontSize: 14,
-    color: "#666666",
-    textAlign: "center",
-    fontWeight: "600",
+    color: c.icon,
+    marginTop: 8,
+    marginBottom: 10,
   },
-  achievementsCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    minHeight: 130,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    shadowColor: "#0E1A18",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+  progressTrack: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: c.surfaceMuted,
+    overflow: "hidden",
+    marginBottom: 12,
   },
-  achievementsText: {
-    fontSize: 14,
-    color: "#9A9A9A",
-    fontWeight: "600",
+  progressFill: {
+    height: "100%",
+    backgroundColor: c.tint,
   },
-  editButton: {
-    marginTop: 14,
-    backgroundColor: "#C76341",
-    borderRadius: 12,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
+  actionsRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 10,
   },
-  editButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+  cardPrimaryButton: {
+    marginTop: 8,
+    backgroundColor: c.tint,
+    borderRadius: 10,
+    height: 42,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cardPrimaryButtonText: {
+    color: c.onPrimary,
+    fontSize: 14,
     fontWeight: "700",
+  },
+  cardSecondaryButton: {
+    flex: 1,
+    backgroundColor: c.surfaceMuted,
+    borderRadius: 10,
+    height: 42,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cardSecondaryButtonText: {
+    color: c.heading,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  cardDangerButton: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.error,
+    height: 42,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cardDangerButtonText: {
+    color: c.error,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  emptyStateText: {
+    fontSize: 15,
+    color: c.icon,
   },
 });
 
-export default mountains;
+export default MountainsPage;

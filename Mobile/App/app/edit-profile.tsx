@@ -11,6 +11,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from "@/constants/theme";
+
+const c = Colors.light;
 
 export default function EditProfileScreen() {
   const params = useLocalSearchParams<{ username?: string; email?: string }>();
@@ -74,48 +78,50 @@ export default function EditProfileScreen() {
         style={styles.screen}
         behavior={Platform.select({ ios: "padding", android: undefined })}
       >
-        <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.title}>Edit Profile</Text>
-          <Text style={styles.subtitle}>Update your username and email</Text>
+        <SafeAreaView style={styles.screen} edges={["top"]}>
+          <ScrollView contentContainerStyle={styles.content}>
+            <Text style={styles.title}>Edit Profile</Text>
+            <Text style={styles.subtitle}>Update your username and email</Text>
 
-          <View style={styles.card}>
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              value={username}
-              onChangeText={setUsername}
-              placeholder="Enter a username"
-              autoCapitalize="none"
-              style={styles.input}
-            />
+            <View style={styles.card}>
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Enter a username"
+                autoCapitalize="none"
+                style={styles.input}
+              />
 
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter an email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-            />
-            {showEmailError ? (
-              <Text style={styles.errorText}>Enter a valid email address.</Text>
-            ) : null}
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter an email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.input}
+              />
+              {showEmailError ? (
+                <Text style={styles.errorText}>Enter a valid email address.</Text>
+              ) : null}
 
-            <View style={styles.actionsRow}>
-              <Pressable style={styles.cancelButton} onPress={onCancel}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.saveButton, !emailIsValid && styles.saveButtonDisabled]}
-                onPress={onSave}
-                disabled={!emailIsValid}
-              >
-                <Text style={styles.saveButtonText}>Save Profile</Text>
-              </Pressable>
+              <View style={styles.actionsRow}>
+                <Pressable style={styles.cancelButton} onPress={onCancel}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.saveButton, !emailIsValid && styles.saveButtonDisabled]}
+                  onPress={onSave}
+                  disabled={!emailIsValid}
+                >
+                  <Text style={styles.saveButtonText}>Save Profile</Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </>
   );
@@ -124,7 +130,7 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#ECEDEE",
+    backgroundColor: c.background,
   },
   content: {
     padding: 16,
@@ -132,19 +138,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 34,
     fontWeight: "700",
-    color: "#2F2F2F",
+    color: c.heading,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 18,
-    color: "#666666",
+    color: c.subtitle,
     marginBottom: 16,
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderRadius: 16,
     padding: 16,
-    shadowColor: "#0E1A18",
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -153,33 +159,33 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#4A4A4A",
+    color: c.text,
     marginBottom: 6,
     marginTop: 6,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#D6D6D6",
+    borderColor: c.border,
     borderRadius: 10,
     height: 46,
     paddingHorizontal: 12,
     fontSize: 16,
-    color: "#2D2D2D",
-    backgroundColor: "#FAFAFA",
+    color: c.text,
+    backgroundColor: c.inputBackground,
   },
   saveButton: {
     flex: 1,
     height: 48,
     borderRadius: 12,
-    backgroundColor: "#C76341",
+    backgroundColor: c.tint,
     alignItems: "center",
     justifyContent: "center",
   },
   saveButtonDisabled: {
-    backgroundColor: "#D7A795",
+    backgroundColor: c.disabled,
   },
   saveButtonText: {
-    color: "#FFFFFF",
+    color: c.onPrimary,
     fontSize: 16,
     fontWeight: "700",
   },
@@ -193,19 +199,19 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#C76341",
+    borderColor: c.tint,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
   },
   cancelButtonText: {
-    color: "#C76341",
+    color: c.tint,
     fontSize: 16,
     fontWeight: "700",
   },
   errorText: {
     marginTop: 6,
-    color: "#B33A2B",
+    color: c.error,
     fontSize: 13,
     fontWeight: "600",
   },
