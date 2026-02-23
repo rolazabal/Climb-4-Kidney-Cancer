@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 
 # SCHEMA
-class Mountain(BaseModel):
+class user(BaseModel):
     name: str
     height: float
     location: str
