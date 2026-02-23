@@ -23,7 +23,7 @@ const stats: StatItem[] = [
   { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: 0 },
 ];
 
-export default function Index() {
+function profile_page() {
   const params = useLocalSearchParams<{ username?: string; email?: string }>();
   const username =
     typeof params.username === "string" && params.username.trim().length > 0
@@ -278,3 +278,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+export default profile_page;
