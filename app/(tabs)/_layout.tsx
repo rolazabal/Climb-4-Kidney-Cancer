@@ -8,6 +8,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Play, Pause, RotateCcw, Flag, Mountain as MountainIcon, Trophy } from 'lucide-react-native';
 import { Mountain, TrendingUp, Map, Settings, User, LucideIcon } from 'lucide-react-native'; //for navigation bar
+import { Stack } from 'expo-router';
+import { Text, TextProps } from 'react-native';
 
 
 const theme = {
@@ -65,5 +67,15 @@ export default function TabLayout() {
         }}
         />
       </Tabs>
+  );
+}
+
+// Global AppText component (use this instead of Text across the app)
+export function AppText(props: TextProps) {
+  return (
+    <Text
+      {...props}
+      style={[{ fontFamily: 'Trebuchet MS'}, props.style]}
+    />
   );
 }
