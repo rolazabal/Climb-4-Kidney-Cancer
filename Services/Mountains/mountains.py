@@ -59,7 +59,7 @@ async def update_mountain(conn, mountain_uuid: str, name=None, height=None, loca
 
 
 # "DELETE 1" or "DELETE 0"
-async def delete_mountain_db(conn, mountain_id: str):
+async def delete_mountain(conn, mountain_id: str):
     row = await conn.execute(
         "DELETE FROM mountains WHERE uuid=$1",
         mountain_id
@@ -91,7 +91,9 @@ DBurl = "postgresql://summit_admin:admin0415@localhost:5432/mountains_service"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    app.state.pool = await asyncpg.create_pool(DBurl)
+    app.state.pool = await asyncpg.create_pool(
+        "postgresql://postgres:219448602@localhost:5433/mountains_service"
+    )
     async with app.state.pool.acquire() as conn:
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS mountains(
@@ -152,7 +154,7 @@ async def get_mountains():
 @app.delete("/mountains/{mountain_id}")
 async def delete_mountain(mountain_id: str):
     async with app.state.pool.acquire() as conn:
-        result = await delete_mountain_db(conn, mountain_id)
+        result = await delete_mountain(conn, mountain_id)
 
     if result.endswith("0"):
         raise HTTPException(404, "Mountain not found")
