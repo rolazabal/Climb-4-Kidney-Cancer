@@ -92,7 +92,7 @@ DBurl = "postgresql://summit_admin:admin0415@localhost:5432/mountains_service"
 async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(
-        "postgresql://postgres:219448602@localhost:5433/mountains_service"
+       DBurl
     )
     async with app.state.pool.acquire() as conn:
         await conn.execute("""
