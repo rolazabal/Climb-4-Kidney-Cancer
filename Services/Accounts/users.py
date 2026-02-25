@@ -30,7 +30,7 @@ async def create_user(conn, email, username, dob, bio = None, profile_photo_medi
     row = await conn.fetchrow('''
         INSERT INTO users(email, username, dob, bio, profile_photo_media_id) 
         VALUES($1, $2, $3, $4, $5) 
-        RETURNING uuid
+        RETURNING id
     ''', email, username, dob, bio, profile_photo_media_id)
     
     return str(row["uuid"])
@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
                 dob DATE,
                 bio TEXT,
                 profile_photo_media_id varchar(255)      
-        )
+        );
     """)
 
     yield
@@ -130,7 +130,7 @@ async def add_user(users: User):
 
 # get user by id
 @app.get("/users/{users_id}")
-async def get_user(users_id: str):
+async def get_user(users_id: uuid):
 
     async with app.state.pool.acquire() as conn:
         result = await get_user(conn, users_id)
