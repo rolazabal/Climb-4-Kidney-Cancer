@@ -36,7 +36,15 @@ async def create_user(conn, email, username, dob, bio = None, profile_photo_medi
         RETURNING uuid
     ''', email, username, dob, bio, profile_photo_media_id)
     
-    return str(row["uuid"])
+    user_id = row["uuid"]
+
+    # create default settings row
+    await conn.execute('''
+        INSERT INTO user_settings(user_id, notification_on)
+        VALUES($1, true)
+    ''', user_id)
+
+    return str(user_id)
 
 async def update_user(conn, user_id: str, email=None, username=None, dob=None, bio=None, profile_photo_media_id=None):
     element_updates = {}
@@ -56,12 +64,12 @@ async def update_user(conn, user_id: str, email=None, username=None, dob=None, b
     set_clause = ", ".join(
         f"{col} = ${i}" for i, col in enumerate(element_updates.keys(), start=1)
     )
-    query = f"UPDATE users SET {set_clause} WHERE id = ${len(element_updates) + 1}"
+    query = f"UPDATE users SET {set_clause} WHERE uuid = ${len(element_updates) + 1}"
 
     values = list(element_updates.values()) + [user_id]
     return await conn.execute(query, *values)
 
-async def delete_user(conn, user_id: str):
+async def delete_user_db(conn, user_id: str):
     return await conn.execute('''
         DELETE FROM users WHERE uuid = $1
     ''', user_id)
@@ -82,7 +90,7 @@ async def list_users(conn):
     ''')
 
 async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
-    row = await conn.execute(
+    return await conn.execute(
         "UPDATE user_settings SET notification_on = $2 WHERE user_id=$1",
         user_id, notification_on
     )
@@ -149,7 +157,7 @@ async def add_user(users: User):
     return {"id": new_id}
 
 # get user by id
-@app.get("/users/{users_id}")
+@app.get("/users/id/{user_id}")
 async def get_user(users_id: str):
 
     async with app.state.pool.acquire() as conn:
@@ -161,7 +169,7 @@ async def get_user(users_id: str):
     return dict(result)
 
 # get user by name
-@app.get("/users/{username}")
+@app.get("/users/username/{username}")
 async def get_user_by_name(username: str):
     async with app.state.pool.acquire() as conn:
         result = await read_user_by_name(conn, username)
@@ -176,7 +184,7 @@ async def get_user_by_name(username: str):
 @app.delete("/users/{users_id}")
 async def delete_user(users_id: str):
     async with app.state.pool.acquire() as conn:
-        result = await delete_user(conn, users_id)
+        result = await delete_user_db(conn, users_id)
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
@@ -211,7 +219,7 @@ async def get_users():
 
 # toggle notification setting
 @app.put("/user_settings/{user_id}")
-async def toggle(user_id: int, notification_on: bool = Body(...)):
+async def toggle(user_id: uuid.UUID, notification_on: bool = Body(...)):
     async with app.state.pool.acquire() as conn:
         result = await toggle_notification(conn, user_id, notification_on)
 
