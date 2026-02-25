@@ -33,12 +33,20 @@ async def create_user(conn, email, username, dob, bio = None, profile_photo_medi
     row = await conn.fetchrow('''
         INSERT INTO users(email, username, dob, bio, profile_photo_media_id) 
         VALUES($1, $2, $3, $4, $5) 
-        RETURNING id
+        RETURNING uuid
     ''', email, username, dob, bio, profile_photo_media_id)
     
-    return str(row["id"])
+    user_id = row["uuid"]
 
-async def update_user(conn, user_id: uuid.UUID, email=None, username=None, dob=None, bio=None, profile_photo_media_id=None):
+    # create default settings row
+    await conn.execute('''
+        INSERT INTO user_settings(user_id, notification_on)
+        VALUES($1, true)
+    ''', user_id)
+
+    return str(user_id)
+
+async def update_user(conn, user_id: str, email=None, username=None, dob=None, bio=None, profile_photo_media_id=None):
     element_updates = {}
     if email is not None:
         element_updates["email"] = email
@@ -56,33 +64,33 @@ async def update_user(conn, user_id: uuid.UUID, email=None, username=None, dob=N
     set_clause = ", ".join(
         f"{col} = ${i}" for i, col in enumerate(element_updates.keys(), start=1)
     )
-    query = f"UPDATE users SET {set_clause} WHERE id = ${len(element_updates) + 1}"
+    query = f"UPDATE users SET {set_clause} WHERE uuid = ${len(element_updates) + 1}"
 
     values = list(element_updates.values()) + [user_id]
     return await conn.execute(query, *values)
 
-async def delete_user(conn, user_id: uuid.UUID):
+async def delete_user_db(conn, user_id: str):
     return await conn.execute('''
-        DELETE FROM users WHERE id = $1
+        DELETE FROM users WHERE uuid = $1
     ''', user_id)
 
-async def get_user(conn, user_id: uuid.UUID):
+async def read_user(conn, user_id: str):
     return await conn.fetchrow('''
-        SELECT * FROM users WHERE id = $1
+        SELECT * FROM users WHERE uuid = $1
     ''', user_id)
 
-async def get_user_by_name(conn, username: str):
+async def read_user_by_name(conn, username: str):
     return await conn.fetchrow('''
         SELECT * FROM users WHERE username = $1
     ''', username)
 
-async def get_all_users(conn):
+async def list_users(conn):
     return await conn.fetch('''
         SELECT * FROM users
     ''')
 
 async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
-    row = await conn.execute(
+    return await conn.execute(
         "UPDATE user_settings SET notification_on = $2 WHERE user_id=$1",
         user_id, notification_on
     )
@@ -91,30 +99,35 @@ async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/accounts_service"
+DBurl = "postgresql://postgres:admin@localhost:5432/accounts_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(DBurl)
     async with app.state.pool.acquire() as conn:
-        await conn.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')
+        
+        # enable UUID generation
+        await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+        
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
-                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 email varchar(255) NOT NULL UNIQUE,
                 username varchar NOT NULL UNIQUE,
                 dob DATE,
                 bio TEXT,
                 profile_photo_media_id varchar(255)
-            );
+            )
+        """)
 
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_settings(
-                user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-                notification_on boolean NOT NULL DEFAULT true
-            );
-    """)
-
+                    user_id uuid PRIMARY KEY REFERENCES users(uuid) ON DELETE CASCADE,
+                    notification_on boolean NOT NULL DEFAULT true
+                )
+        """)
+    
     yield
 
     # shutdown
@@ -122,6 +135,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
 
 
 # ----------
@@ -144,10 +158,10 @@ async def add_user(users: User):
 
 # get user by id
 @app.get("/users/id/{user_id}")
-async def get_user_by_id(user_id: uuid.UUID):
+async def get_user(users_id: str):
 
     async with app.state.pool.acquire() as conn:
-        result = await get_user(conn, user_id)
+        result = await read_user(conn, users_id)
 
     if not result:
         raise HTTPException(404, "User not found")
@@ -156,9 +170,9 @@ async def get_user_by_id(user_id: uuid.UUID):
 
 # get user by name
 @app.get("/users/username/{username}")
-async def get_user_by_name_search(username: str):
+async def get_user_by_name(username: str):
     async with app.state.pool.acquire() as conn:
-        result = await get_user_by_name(conn, username)
+        result = await read_user_by_name(conn, username)
 
     if not result:
         raise HTTPException(404, "User not found")
@@ -168,9 +182,9 @@ async def get_user_by_name_search(username: str):
 
 # delete user entry
 @app.delete("/users/{users_id}")
-async def user_delete(users_id: uuid.UUID):
+async def delete_user(users_id: str):
     async with app.state.pool.acquire() as conn:
-        result = await delete_user(conn, users_id)
+        result = await delete_user_db(conn, users_id)
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
@@ -179,7 +193,7 @@ async def user_delete(users_id: uuid.UUID):
 
 # update user entry
 @app.patch("/users/{users_id}")
-async def patch_user(users_id: uuid.UUID, patch: dict = Body(...)):
+async def patch_user(users_id: str, patch: dict = Body(...)):
     allowed = {"email", "username", "dob", "bio", "profile_photo_media_id"}
     data = {k: v for k, v in patch.items() if k in allowed and v is not None}
     if "url" in data:
@@ -194,9 +208,9 @@ async def patch_user(users_id: uuid.UUID, patch: dict = Body(...)):
 
 # get all users
 @app.get("/users")
-async def get_user_lists():
+async def get_users():
     async with app.state.pool.acquire() as conn:
-        result = await get_all_users(conn)
+        result = await list_users(conn)
 
     if not result:
         raise HTTPException(404, "No users found")
