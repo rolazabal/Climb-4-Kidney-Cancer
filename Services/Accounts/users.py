@@ -18,8 +18,8 @@ class User(BaseModel):
     bio: str | None = None
     profile_photo_media_id: str | None = None
 
-class User_Settings(BaseModel):
-    user_id: int
+class UserSettings(BaseModel):
+    user_id: uuid.UUID
     notification_on: bool
 
 
