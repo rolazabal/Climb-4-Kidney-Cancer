@@ -23,24 +23,15 @@ class Mountain(BaseModel):
 # DB Functions (CRUD)
 # --------------------
 
-# simple uid generator
-_next_uid = 0
 
-def generate_uid():
-    global _next_uid
-    _next_uid += 1
-    return _next_uid
+async def create_mountain(conn, name, height, location, description=None, image_url=None):
+    row = await conn.fetchrow('''
+        INSERT INTO mountains(name, height, location, description, image_url)
+        VALUES($1, $2, $3, $4, $5)
+        RETURNING uuid
+    ''', name, height, location, description, image_url)
 
-#async def get_connection():
-	
-
-async def create_mountain(conn, name, height, location, description = None, image_url = None):
-	new_id = str(generate_uid()) # generating ID
- 
-	await conn.execute('''
-		INSERT INTO mountains(uuid, name, height, location, description, image_url) VALUES($1, $2, $3, $4, $5, $6)
-	''', new_id, name, height, location, description, image_url)
-	return new_id
+    return str(row["uuid"])
 
 
 async def update_mountain(conn, mountain_uuid: str, name=None, height=None, location=None, description=None, image_url=None):
@@ -106,7 +97,7 @@ async def lifespan(app: FastAPI):
     async with app.state.pool.acquire() as conn:
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS mountains(
-                uuid text PRIMARY KEY,
+                uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 name text NOT NULL,
                 height real NOT NULL,
                 location text NOT NULL,

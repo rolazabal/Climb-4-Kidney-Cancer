@@ -18,6 +18,9 @@ class User(BaseModel):
     bio: str | None = None
     profile_photo_media_id: str | None = None
 
+class User_Settings(BaseModel):
+    user_id: int
+    notification_on: bool
 
 
 # --------------------
@@ -27,11 +30,13 @@ class User(BaseModel):
 #async def get_connection():
 
 async def create_user(conn, email, username, dob, bio = None, profile_photo_media_id = None):
-    new_id = str(uuid.uuid4()) # generating ID
-    await conn.execute('''
-        INSERT INTO users(id, email, username, dob, bio, profile_photo_media_id) VALUES($1, $2, $3, $4, $5, $6)
-    ''', new_id, email, username, dob, bio, profile_photo_media_id)
-    return new_id
+    row = await conn.fetchrow('''
+        INSERT INTO users(email, username, dob, bio, profile_photo_media_id) 
+        VALUES($1, $2, $3, $4, $5) 
+        RETURNING uuid
+    ''', email, username, dob, bio, profile_photo_media_id)
+    
+    return str(row["uuid"])
 
 async def update_user(conn, user_id: str, email=None, username=None, dob=None, bio=None, profile_photo_media_id=None):
     element_updates = {}
@@ -95,7 +100,7 @@ async def lifespan(app: FastAPI):
     async with app.state.pool.acquire() as conn:
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
-                id uuid PRIMARY KEY,
+                uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 email varchar(255) NOT NULL UNIQUE,
                 username varchar NOT NULL UNIQUE,
                 dob DATE,
