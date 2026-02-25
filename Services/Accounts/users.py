@@ -1,5 +1,6 @@
 # IMPORTS
-# type "fastapi dev mountains.py" in console to run
+# type "fastapi dev users.py" in console to run
+from datetime import date
 import asyncpg
 import asyncio
 import uuid
@@ -10,12 +11,12 @@ from pydantic import BaseModel
 
 
 # SCHEMA
-class user(BaseModel):
-    name: str
-    height: float
-    location: str
-    description: str | None = None
-    url: str | None = None
+class User(BaseModel):
+    email: str
+    username: str
+    dob: date | None = None
+    bio: str | None = None
+    profile_photo_media_id: str | None = None
 
 
 
@@ -23,36 +24,78 @@ class user(BaseModel):
 # DB Functions (CRUD)
 # --------------------
 
-# simple uid generator
-_next_uid = 0
+#async def get_connection():
 
-def generate_uid():
-    global _next_uid
-    _next_uid += 1
-    return _next_uid
+async def create_user(conn, email, username, dob, bio = None, profile_photo_media_id = None):
+    new_id = str(uuid.uuid4()) # generating ID
+    await conn.execute('''
+        INSERT INTO users(id, email, username, dob, bio, profile_photo_media_id) VALUES($1, $2, $3, $4, $5, $6)
+    ''', new_id, email, username, dob, bio, profile_photo_media_id)
+    return new_id
+
+async def update_user(conn, user_id: str, email=None, username=None, dob=None, bio=None, profile_photo_media_id=None):
+    element_updates = {}
+    if email is not None:
+        element_updates["email"] = email
+    if username is not None:
+        element_updates["username"] = username
+    if dob is not None:
+        element_updates["dob"] = dob
+    if bio is not None:
+        element_updates["bio"] = bio
+    if profile_photo_media_id is not None:
+        element_updates["profile_photo_media_id"] = profile_photo_media_id
+    if not element_updates:
+        return "UPDATE 0"  # or raise ValueError / HTTPException
+
+    set_clause = ", ".join(
+        f"{col} = ${i}" for i, col in enumerate(element_updates.keys(), start=1)
+    )
+    query = f"UPDATE users SET {set_clause} WHERE id = ${len(element_updates) + 1}"
+
+    values = list(element_updates.values()) + [user_id]
+    return await conn.execute(query, *values)
+
+async def delete_user(conn, user_id: str):
+    return await conn.execute('''
+        DELETE FROM users WHERE id = $1
+    ''', user_id)
+
+async def get_user(conn, user_id: str):
+    return await conn.fetchrow('''
+        SELECT * FROM users WHERE id = $1
+    ''', user_id)
+
+async def get_user_by_name(conn, username: str):
+    return await conn.fetchrow('''
+        SELECT * FROM users WHERE username = $1
+    ''', username)
+
+async def get_all_users(conn):
+    return await conn.fetch('''
+        SELECT * FROM users
+    ''')
 
 
 # --------------
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost/mountains_service"
+DBurl = "postgresql://summit_admin:admin0415@localhost:5432/accounts_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    app.state.pool = await asyncpg.create_pool(
-        "postgresql://postgres:admin@localhost/mountains_service"
-    )
+    app.state.pool = await asyncpg.create_pool(DBurl)
     async with app.state.pool.acquire() as conn:
         await conn.execute("""
-            CREATE TABLE IF NOT EXISTS mountains(
-                uuid text PRIMARY KEY,
-                name text NOT NULL,
-                height real NOT NULL,
-                location text NOT NULL,
-                description text,
-                image_url text
+            CREATE TABLE IF NOT EXISTS users(
+                id uuid PRIMARY KEY,
+                email varchar(255) NOT NULL UNIQUE,
+                username varchar NOT NULL UNIQUE,
+                dob DATE,
+                bio TEXT,
+                profile_photo_media_id varchar(255)      
         )
     """)
 
@@ -68,3 +111,78 @@ app = FastAPI(lifespan=lifespan)
 # ----------
 # ROUTES
 # ----------
+
+@app.post("/users")
+async def add_user(users: User):
+    async with app.state.pool.acquire() as conn:
+        new_id = await create_user(
+            conn,
+            users.email,
+            users.username,
+            users.dob,
+            users.bio,
+            users.profile_photo_media_id
+        )
+        
+    return {"id": new_id}
+
+# get user by id
+@app.get("/users/{users_id}")
+async def get_user(users_id: str):
+
+    async with app.state.pool.acquire() as conn:
+        result = await get_user(conn, users_id)
+
+    if not result:
+        raise HTTPException(404, "User not found")
+
+    return dict(result)
+
+# get user by name
+@app.get("/users/{username}")
+async def get_user_by_name(username: str):
+    async with app.state.pool.acquire() as conn:
+        result = await get_user_by_name(conn, username)
+
+    if not result:
+        raise HTTPException(404, "User not found")
+
+    return dict(result)
+
+
+# delete user entry
+@app.delete("/users/{users_id}")
+async def delete_user(users_id: str):
+    async with app.state.pool.acquire() as conn:
+        result = await delete_user(conn, users_id)
+
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+
+    return {"message": "User deleted"}
+
+# update user entry
+@app.patch("/users/{users_id}")
+async def patch_user(users_id: str, patch: dict = Body(...)):
+    allowed = {"email", "username", "dob", "bio", "profile_photo_media_id"}
+    data = {k: v for k, v in patch.items() if k in allowed and v is not None}
+    if "url" in data:
+        data["image_url"] = data.pop("url")
+
+    async with app.state.pool.acquire() as conn:
+        result = await update_user(conn, users_id, **data)
+
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+    return {"message": "User updated"}
+
+# get all users
+@app.get("/users")
+async def get_all_users():
+    async with app.state.pool.acquire() as conn:
+        result = await get_all_users(conn)
+
+    if not result:
+        raise HTTPException(404, "No users found")
+
+    return [dict(record) for record in result]  
