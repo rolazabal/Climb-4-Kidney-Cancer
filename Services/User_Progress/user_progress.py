@@ -10,8 +10,9 @@ from pydantic import BaseModel
 
 
 # SCHEMA
-class Mountain(BaseModel):
-    name: str
+class Users(BaseModel):
+    email: str
+    username: str
     height: float
     location: str
     description: str | None = None
@@ -68,3 +69,5 @@ app = FastAPI(lifespan=lifespan)
 # ----------
 # ROUTES
 # ----------
+
+
