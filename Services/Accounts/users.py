@@ -19,7 +19,6 @@ class User(BaseModel):
     profile_photo_media_id: str | None = None
 
 class User_Settings(BaseModel):
-    user_id: int
     notification_on: bool
 
 
@@ -56,32 +55,32 @@ async def update_user(conn, user_id: str, email=None, username=None, dob=None, b
     set_clause = ", ".join(
         f"{col} = ${i}" for i, col in enumerate(element_updates.keys(), start=1)
     )
-    query = f"UPDATE users SET {set_clause} WHERE id = ${len(element_updates) + 1}"
+    query = f"UPDATE users SET {set_clause} WHERE uuid = ${len(element_updates) + 1}"
 
     values = list(element_updates.values()) + [user_id]
     return await conn.execute(query, *values)
 
 async def delete_user(conn, user_id: str):
     return await conn.execute('''
-        DELETE FROM users WHERE id = $1
+        DELETE FROM users WHERE uuid = $1
     ''', user_id)
 
-async def get_user(conn, user_id: str):
+async def read_user(conn, user_id: str):
     return await conn.fetchrow('''
-        SELECT * FROM users WHERE id = $1
+        SELECT * FROM users WHERE uuid = $1
     ''', user_id)
 
-async def get_user_by_name(conn, username: str):
+async def read_user_by_name(conn, username: str):
     return await conn.fetchrow('''
         SELECT * FROM users WHERE username = $1
     ''', username)
 
-async def get_all_users(conn):
+async def list_users(conn):
     return await conn.fetch('''
         SELECT * FROM users
     ''')
 
-async def toggle_notification(conn, user_id: int, notification_on: bool):
+async def toggle_notification(conn, user_id: str, notification_on: bool):
     row = await conn.execute(
         "UPDATE user_settings SET notification_on = $2 WHERE user_id=$1",
         user_id, notification_on
@@ -91,7 +90,7 @@ async def toggle_notification(conn, user_id: int, notification_on: bool):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/accounts_service"
+DBurl = "postgresql://postgres:219448602@localhost:5433/accounts_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -106,14 +105,14 @@ async def lifespan(app: FastAPI):
                 dob DATE,
                 bio TEXT,
                 profile_photo_media_id varchar(255)
-            )
+            );
 
             CREATE TABLE IF NOT EXISTS user_settings(
-                user_id int PRIMARY KEY,
+                user_id uuid PRIMARY KEY,
                 notification_on boolean NOT NULL DEFAULT true,
                 CONSTRAINT fk_user_settings_user_id
-                    FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
-            )
+                    FOREIGN KEY (user_id) REFERENCES users (uuid) ON DELETE CASCADE
+            );
     """)
 
     yield
@@ -140,7 +139,7 @@ async def add_user(users: User):
             users.bio,
             users.profile_photo_media_id
         )
-        
+
     return {"id": new_id}
 
 # get user by id
@@ -148,7 +147,7 @@ async def add_user(users: User):
 async def get_user(users_id: str):
 
     async with app.state.pool.acquire() as conn:
-        result = await get_user(conn, users_id)
+        result = await read_user(conn, users_id)
 
     if not result:
         raise HTTPException(404, "User not found")
@@ -159,7 +158,7 @@ async def get_user(users_id: str):
 @app.get("/users/{username}")
 async def get_user_by_name(username: str):
     async with app.state.pool.acquire() as conn:
-        result = await get_user_by_name(conn, username)
+        result = await read_user_by_name(conn, username)
 
     if not result:
         raise HTTPException(404, "User not found")
@@ -197,12 +196,12 @@ async def patch_user(users_id: str, patch: dict = Body(...)):
 @app.get("/users")
 async def get_all_users():
     async with app.state.pool.acquire() as conn:
-        result = await get_all_users(conn)
+        result = await list_users(conn)
 
     if not result:
         raise HTTPException(404, "No users found")
 
-    return [dict(record) for record in result]  
+    return dict(result)
 
 # toggle notification setting
 @app.put("/user_settings/{user_id}")
