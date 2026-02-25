@@ -18,6 +18,9 @@ class User(BaseModel):
     bio: str | None = None
     profile_photo_media_id: str | None = None
 
+class UserSettings(BaseModel):
+    user_id: uuid.UUID
+    notification_on: bool
 
 
 # --------------------
@@ -30,7 +33,7 @@ async def create_user(conn, email, username, dob, bio = None, profile_photo_medi
     row = await conn.fetchrow('''
         INSERT INTO users(email, username, dob, bio, profile_photo_media_id) 
         VALUES($1, $2, $3, $4, $5) 
-        RETURNING id
+        RETURNING uuid
     ''', email, username, dob, bio, profile_photo_media_id)
     
     return str(row["uuid"])
@@ -78,6 +81,11 @@ async def get_all_users(conn):
         SELECT * FROM users
     ''')
 
+async def toggle_notification(conn, user_id: int, notification_on: bool):
+    row = await conn.execute(
+        "UPDATE user_settings SET notification_on = $2 WHERE user_id=$1",
+        user_id, notification_on
+    )
 
 # --------------
 # LIFESPAN 
@@ -97,8 +105,15 @@ async def lifespan(app: FastAPI):
                 username varchar NOT NULL UNIQUE,
                 dob DATE,
                 bio TEXT,
-                profile_photo_media_id varchar(255)      
-        );
+                profile_photo_media_id varchar(255)
+            )
+
+            CREATE TABLE IF NOT EXISTS user_settings(
+                user_id int PRIMARY KEY,
+                notification_on boolean NOT NULL DEFAULT true,
+                CONSTRAINT fk_user_settings_user_id
+                    FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+            )
     """)
 
     yield
@@ -130,7 +145,7 @@ async def add_user(users: User):
 
 # get user by id
 @app.get("/users/{users_id}")
-async def get_user(users_id: uuid):
+async def get_user(users_id: str):
 
     async with app.state.pool.acquire() as conn:
         result = await get_user(conn, users_id)
@@ -188,3 +203,14 @@ async def get_all_users():
         raise HTTPException(404, "No users found")
 
     return [dict(record) for record in result]  
+
+# toggle notification setting
+@app.put("/user_settings/{user_id}")
+async def toggle_notification(user_id: int, notification_on: bool = Body(...)):
+    async with app.state.pool.acquire() as conn:
+        result = await toggle_notif(conn, user_id, notification_on)
+
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+
+    return {"message": "Notification setting updated"}
