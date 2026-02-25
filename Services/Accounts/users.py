@@ -109,10 +109,10 @@ async def lifespan(app: FastAPI):
             )
 
             CREATE TABLE IF NOT EXISTS user_settings(
-                user_id int PRIMARY KEY,
+                user_id uuid PRIMARY KEY REFERENCES users(uuid) ON DELETE CASCADE,
                 notification_on boolean NOT NULL DEFAULT true,
                 CONSTRAINT fk_user_settings_user_id
-                    FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+                    FOREIGN KEY (user_id) REFERENCES users (uuid) ON DELETE CASCADE
             )
     """)
 
@@ -206,9 +206,9 @@ async def get_all_users():
 
 # toggle notification setting
 @app.put("/user_settings/{user_id}")
-async def toggle_notification(user_id: int, notification_on: bool = Body(...)):
+async def toggle(user_id: int, notification_on: bool = Body(...)):
     async with app.state.pool.acquire() as conn:
-        result = await toggle_notif(conn, user_id, notification_on)
+        result = await toggle_notification(conn, user_id, notification_on)
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
