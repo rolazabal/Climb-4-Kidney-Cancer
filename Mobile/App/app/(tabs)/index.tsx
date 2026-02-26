@@ -1,4 +1,5 @@
 import {StyleSheet, Text, View, FlatList} from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // mock mountain data
 const dataList = [
@@ -45,10 +46,10 @@ const Item = ({mountain}) => (
     </View>
 );
 
-function climbs() {
+function Climbs() {
 
     return (
-        <View style={{flex: 1}}>
+        <SafeAreaView style={{flex: 1}}>
             <View style={{flex: 1, backgroundColor: 'powderblue'}}>
                 <Text style={styles.label}>Climbs</Text>
             </View>
@@ -59,7 +60,7 @@ function climbs() {
                     renderItem={({item}) => <Item mountain={item} />}
                 />
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -75,4 +76,4 @@ const styles = StyleSheet.create({
     }
 });
 
-export default climbs;
+export default Climbs;
