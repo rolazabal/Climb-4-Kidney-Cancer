@@ -2,6 +2,15 @@ import {StyleSheet, ScrollView, Text, View, FlatList, TouchableOpacity} from 're
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from 'react';
 
+const theme = {
+    primary: 'rgb(51, 51, 51)',
+    secondary: 'rgb(102, 102, 101)',
+    accent: 'rgb(205, 88, 56)',
+    accentDark: 'rgb(185, 68, 36)',
+    background: '#F9FAFB',
+    white: '#FFFFFF',
+};
+
 function Mountains() {
 
     const mountainData = {
@@ -54,7 +63,7 @@ function Mountains() {
         <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
             <View style={{flex: 1}}>
                 <View style={{flex: 1, marginBottom: 20}}>
-                    <Text style={styles.label}>
+                    <Text style={[styles.label, {color: theme.primary}]}>
                         Mountains
                     </Text>
                     <Text style={styles.small}>
@@ -63,7 +72,7 @@ function Mountains() {
                 </View>
                 <View style={{flex: 2, marginVertical: 10, flexDirection: 'row'}}>
                     <View style={styles.info}>
-                        <Text style={styles.label}>
+                        <Text style={[styles.label, {color: theme.accent}]}>
                             {summits}
                         </Text>
                         <Text style={styles.small}>
@@ -72,7 +81,7 @@ function Mountains() {
                     </View>
                     <View style={{flex: 1}}></View>
                     <View style={styles.info}>
-                        <Text style={styles.label}>
+                        <Text style={[styles.label, {color: theme.accent}]}>
                             {totalPeaks}
                         </Text>
                         <Text style={styles.small}>
@@ -81,18 +90,18 @@ function Mountains() {
                     </View>
                 </View>
                 <View style={{flex: 1, marginBottom: 10, flexDirection: 'row'}}>
-                    <TouchableOpacity style={[styles.tab, tab == Tabs.all && {backgroundColor: 'orange'}]} onPress={() => setTab(Tabs.all)}>
-                        <Text style={styles.small}>
+                    <TouchableOpacity style={[styles.tab, tab === Tabs.all && {backgroundColor: theme.accent}]} onPress={() => setTab(Tabs.all)}>
+                        <Text style={[styles.small, tab === Tabs.all && {color: theme.white}]}>
                             All
                         </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.tab, tab == Tabs.climbed && {backgroundColor: 'orange'}]} onPress={() => setTab(Tabs.climbed)}>
-                        <Text style={styles.small}>
+                    <TouchableOpacity style={[styles.tab, tab === Tabs.climbed && {backgroundColor: theme.accent}]} onPress={() => setTab(Tabs.climbed)}>
+                        <Text style={[styles.small, tab === Tabs.climbed && {color: theme.white}]}>
                             Climbed
                         </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.tab, tab == Tabs.toClimb && {backgroundColor: 'orange'}]} onPress={() => setTab(Tabs.toClimb)}>
-                        <Text style={styles.small}>
+                    <TouchableOpacity style={[styles.tab, tab === Tabs.toClimb && {backgroundColor: theme.accent}]} onPress={() => setTab(Tabs.toClimb)}>
+                        <Text style={[styles.small, tab === Tabs.toClimb && {color: theme.white}]}>
                             To Climb
                         </Text>
                     </TouchableOpacity>
@@ -116,13 +125,13 @@ function Mountains() {
 function MountainList({arr}) {
 
     const Item = ({mountain}) => (
-        <View style={[styles.item, {flex: 1, backgroundColor: 'powderblue'}]}>
-            <View style={{flex: 1, padding: 10, backgroundColor: 'grey', borderTopStartRadius: 10, borderTopEndRadius: 10}}>
-                <Text style={{fontSize: 24}}>{mountain.name}</Text>
+        <View style={[styles.item, {flex: 1, backgroundColor: theme.white}]}>
+            <View style={{flex: 1, padding: 10, backgroundColor: theme.primary, borderTopStartRadius: 10, borderTopEndRadius: 10}}>
+                <Text style={{fontSize: 24, color: theme.white}}>{mountain.name}</Text>
             </View>
             <View style={{flex: 3, padding: 10}}>
-                <Text style={{fontSize: 18}}>{mountain.location}</Text>
-                <Text style={{fontSize: 18}}>{mountain.peak}</Text>
+                <Text style={{fontSize: 18, color: theme.secondary}}>{mountain.location}</Text>
+                <Text style={{fontSize: 18, color: theme.secondary}}>{mountain.peak}</Text>
             </View>
         </View>
     );
@@ -151,12 +160,13 @@ const styles = StyleSheet.create({
     },
     small: {
         textAlign: 'center',
+        color: theme.secondary,
         fontSize: 20,
     },
     info: {
         flex: 20,
         padding: 10,
-        backgroundColor: 'powderblue',
+        backgroundColor: theme.white,
         borderRadius: 10,
 
     },
