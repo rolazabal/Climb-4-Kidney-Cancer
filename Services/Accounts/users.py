@@ -18,7 +18,8 @@ class User(BaseModel):
     bio: str | None = None
     profile_photo_media_id: str | None = None
 
-class User_Settings(BaseModel):
+class UserSettings(BaseModel):
+    user_id: uuid.UUID
     notification_on: bool
 
 
@@ -35,7 +36,15 @@ async def create_user(conn, email, username, dob, bio = None, profile_photo_medi
         RETURNING uuid
     ''', email, username, dob, bio, profile_photo_media_id)
     
-    return str(row["uuid"])
+    user_id = row["uuid"]
+
+    # create default settings row
+    await conn.execute('''
+        INSERT INTO user_settings(user_id, notification_on)
+        VALUES($1, true)
+    ''', user_id)
+
+    return str(user_id)
 
 async def update_user(conn, user_id: str, email=None, username=None, dob=None, bio=None, profile_photo_media_id=None):
     element_updates = {}
@@ -60,7 +69,7 @@ async def update_user(conn, user_id: str, email=None, username=None, dob=None, b
     values = list(element_updates.values()) + [user_id]
     return await conn.execute(query, *values)
 
-async def delete_user(conn, user_id: str):
+async def delete_user_db(conn, user_id: str):
     return await conn.execute('''
         DELETE FROM users WHERE uuid = $1
     ''', user_id)
@@ -80,8 +89,8 @@ async def list_users(conn):
         SELECT * FROM users
     ''')
 
-async def toggle_notification(conn, user_id: str, notification_on: bool):
-    row = await conn.execute(
+async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
+    return await conn.execute(
         "UPDATE user_settings SET notification_on = $2 WHERE user_id=$1",
         user_id, notification_on
     )
@@ -97,6 +106,10 @@ async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(DBurl)
     async with app.state.pool.acquire() as conn:
+        
+        # enable UUID generation
+        await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+        
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
                 uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -105,16 +118,16 @@ async def lifespan(app: FastAPI):
                 dob DATE,
                 bio TEXT,
                 profile_photo_media_id varchar(255)
-            );
+            )
+        """)
 
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_settings(
-                user_id uuid PRIMARY KEY,
-                notification_on boolean NOT NULL DEFAULT true,
-                CONSTRAINT fk_user_settings_user_id
-                    FOREIGN KEY (user_id) REFERENCES users (uuid) ON DELETE CASCADE
-            );
-    """)
-
+                    user_id uuid PRIMARY KEY REFERENCES users(uuid) ON DELETE CASCADE,
+                    notification_on boolean NOT NULL DEFAULT true
+                )
+        """)
+    
     yield
 
     # shutdown
@@ -122,6 +135,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
 
 
 # ----------
@@ -143,7 +157,7 @@ async def add_user(users: User):
     return {"id": new_id}
 
 # get user by id
-@app.get("/users/{users_id}")
+@app.get("/users/id/{user_id}")
 async def get_user(users_id: str):
 
     async with app.state.pool.acquire() as conn:
@@ -155,7 +169,7 @@ async def get_user(users_id: str):
     return dict(result)
 
 # get user by name
-@app.get("/users/{username}")
+@app.get("/users/username/{username}")
 async def get_user_by_name(username: str):
     async with app.state.pool.acquire() as conn:
         result = await read_user_by_name(conn, username)
@@ -170,7 +184,7 @@ async def get_user_by_name(username: str):
 @app.delete("/users/{users_id}")
 async def delete_user(users_id: str):
     async with app.state.pool.acquire() as conn:
-        result = await delete_user(conn, users_id)
+        result = await delete_user_db(conn, users_id)
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
@@ -194,20 +208,20 @@ async def patch_user(users_id: str, patch: dict = Body(...)):
 
 # get all users
 @app.get("/users")
-async def get_all_users():
+async def get_users():
     async with app.state.pool.acquire() as conn:
         result = await list_users(conn)
 
     if not result:
         raise HTTPException(404, "No users found")
 
-    return dict(result)
+    return [dict(record) for record in result]
 
 # toggle notification setting
 @app.put("/user_settings/{user_id}")
-async def toggle_notification(user_id: int, notification_on: bool = Body(...)):
+async def toggle(user_id: uuid.UUID, notification_on: bool = Body(...)):
     async with app.state.pool.acquire() as conn:
-        result = await toggle_notif(conn, user_id, notification_on)
+        result = await toggle_notification(conn, user_id, notification_on)
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
