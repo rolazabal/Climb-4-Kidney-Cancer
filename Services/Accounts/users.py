@@ -33,10 +33,10 @@ async def create_user(conn, email, username, dob, bio = None, profile_photo_medi
     row = await conn.fetchrow('''
         INSERT INTO users(email, username, dob, bio, profile_photo_media_id) 
         VALUES($1, $2, $3, $4, $5) 
-        RETURNING id
+        RETURNING uuid
     ''', email, username, dob, bio, profile_photo_media_id)
     
-    user_id = row["id"]
+    user_id = row["uuid"]
 
     # create default settings row
     await conn.execute('''
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
         await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
-                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 email varchar(255) NOT NULL UNIQUE,
                 username varchar NOT NULL UNIQUE,
                 dob DATE,
