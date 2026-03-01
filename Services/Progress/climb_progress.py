@@ -7,41 +7,50 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
 from datetime import date
+from enum import Enum
 
-
+class ClimbStatus(str, Enum):
+    active = "active"
+    inactive = "inactive"
+    complete = "complete"
 
 # SCHEMA
 class ClimbProgress(BaseModel):
-    name: str
+    username: str
     mountain: str
     height: float
     start_date: date
     end_date: date | None = None
+    status: ClimbStatus = ClimbStatus.active
+
 
 class ClimbProgressUpdate(BaseModel):
     height: float | None = None
     end_date: date | None = None
+    status: ClimbStatus | None = None
 
 # --------------------
 # DB Functions (CRUD)
 # --------------------
 
 
-async def create_climb_progress(conn, name, mountain, height, start_date, end_date=None):
+async def create_climb_progress(conn, name, mountain, height, start_date):
     row = await conn.fetchrow('''
-        INSERT INTO climbs(name, mountain, height, start_date, end_date)
-        VALUES($1, $2, $3, $4, $5)
+        INSERT INTO climbs(username, mountain, height, start_date)
+        VALUES($1, $2, $3, $4)
         RETURNING climb_uuid
-    ''', name, mountain, height, start_date, end_date)
+    ''', name, mountain, height, start_date)
 
     return str(row["climb_uuid"])
 
-async def update_climb_progress(conn, climb_uuid: str, height=None, end_date=None):
+async def update_climb_progress(conn, climb_uuid: str, height=None, end_date=None, status=None):
     element_updates = {}
     if height is not None:
         element_updates["height"] = height
     if end_date is not None:
         element_updates["end_date"] = end_date
+    if status is not None:
+        element_updates["status"] = status
     if not element_updates:
         return "UPDATE 0"  # or raise ValueError / HTTPException
 
@@ -62,6 +71,19 @@ async def delete_climb(conn, climb: str):
     )
     return row
 
+async def delete_climbs_by_user(conn, user: str):
+    result = await conn.execute(
+        "DELETE FROM climbs WHERE username=$1",
+        user
+    )
+    return result
+
+async def delete_climbs_by_mountain(conn, mountain: str):
+    result = await conn.execute(
+        "DELETE FROM climbs WHERE mountain=$1",
+        mountain
+    )
+    return result
 
 async def read_climb(conn, climb: str):
     row = await conn.fetchrow(
@@ -71,9 +93,17 @@ async def read_climb(conn, climb: str):
     return row
 
 
+async def read_active_climbs_by_user(conn, user: str):
+    rows = await conn.fetch(
+        "SELECT * FROM climbs WHERE username=$1 AND status='active'",
+        user
+    )
+    return [dict(row) for row in rows]
+
+
 async def read_climb_by_user(conn, user: str):
     rows = await conn.fetch(
-        "SELECT * FROM climbs WHERE name=$1",
+        "SELECT * FROM climbs WHERE username=$1",
         user
     )
     return [dict(row) for row in rows]
@@ -96,16 +126,27 @@ async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(DBurl) # name refers to username
     async with app.state.pool.acquire() as conn:
+        # Create enum type if it doesn't exist
+        await conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'climb_status') THEN
+                    CREATE TYPE climb_status AS ENUM ('active', 'inactive', 'complete');
+                END IF;
+            END$$;
+        """)
+
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS climbs(
                 climb_uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                name text NOT NULL,
+                username text NOT NULL,
                 mountain text NOT NULL,
                 height real NOT NULL,
                 start_date date NOT NULL,
-                end_date date
-        )
-    """)
+                end_date date,
+                status climb_status NOT NULL DEFAULT 'active'
+            );
+        """)
 
     yield
 
@@ -124,7 +165,7 @@ async def add_climb(climb: ClimbProgress):
     async with app.state.pool.acquire() as conn:
         new_id = await create_climb_progress(
             conn,
-            climb.name,
+            climb.username,
             climb.mountain,
             climb.height,
             climb.start_date
@@ -145,11 +186,21 @@ async def get_climb(climb_id: str):
     return dict(result)
 
 # get climbs by user
-@app.get("/progress/{username}")
+@app.get("/progress/user/{username}")
 async def get_climbs_by_user(username: str):
     async with app.state.pool.acquire() as conn:
         result = await read_climb_by_user(conn, username)
 
+    if not result:
+        raise HTTPException(404, "Climbs not found for user")
+
+    return [dict(record) for record in result]
+
+# get active climbs by user
+@app.get("/progress/user/{username}/active")
+async def get_active_climbs_by_user(username: str):
+    async with app.state.pool.acquire() as conn:
+        result = await read_active_climbs_by_user(conn, username)
     if not result:
         raise HTTPException(404, "Climbs not found for user")
 
@@ -162,8 +213,29 @@ async def get_climbs():
         result = await list_all_climbs(conn)
     return [dict(record) for record in result]
 
+# delete all of a user's climb entries
+@app.delete("/progress/user/{username}")
+async def delete_user(username: str):
+    async with app.state.pool.acquire() as conn:
+        result = await delete_climbs_by_user(conn, username)
+
+    if result.endswith("0"):
+        raise HTTPException(404, "Climbs not found for user")
+
+    return {"message": "Climbs deleted"}
+
+# delete all of a mountain's climb entries
+@app.delete("/progress/mountain/{mountain}")
+async def delete_mountain(mountain: str):
+    async with app.state.pool.acquire() as conn:
+        result = await delete_climbs_by_mountain(conn, mountain)
+    if result.endswith("0"):
+        raise HTTPException(404, "Climbs not found for user")
+
+    return {"message": "Climbs deleted"}
+
 # delete climb entry
-@app.delete("/progress/{climb_id}")
+@app.delete("/progress/id/{climb_id}")
 async def delete_climb_by_id(climb_id: str):
     async with app.state.pool.acquire() as conn:
         result = await delete_climb(conn, climb_id)
@@ -174,7 +246,7 @@ async def delete_climb_by_id(climb_id: str):
     return {"message": "Climb deleted"}
 
 # update climb entry
-@app.patch("/progress/{climb_id}")
+@app.patch("/progress/update/{climb_id}")
 async def patch_climb(climb_id: str, patch: ClimbProgressUpdate):
 
     data = patch.dict(exclude_unset=True)
