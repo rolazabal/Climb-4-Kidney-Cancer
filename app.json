@@ -4,13 +4,15 @@
     "slug": "SummitSteps",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
     "scheme": "summitsteps",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.SummitSteps"
+      "bundleIdentifier": "com.anonymous.SummitSteps",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "This app reads health data to track climbing activity.",
+        "NSHealthUpdateUsageDescription": "This app writes workout data to Apple Health."
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +22,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.SummitSteps"
     },
     "web": {
       "output": "static",
@@ -40,11 +47,19 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with your profile."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+      
     }
   }
 }

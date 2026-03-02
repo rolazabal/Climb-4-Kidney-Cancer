@@ -7,8 +7,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Play, Pause, RotateCcw, Flag, Mountain as MountainIcon, Trophy } from 'lucide-react-native';
-import { Mountain, TrendingUp, Map, Settings, User, LucideIcon } from 'lucide-react-native'; //for navigation bar
-import { Stack } from 'expo-router';
+import { TrendingUp, Map, Settings, User, LucideIcon } from 'lucide-react-native'; //for navigation bar
 import { Text, TextProps } from 'react-native';
 
 
@@ -35,7 +34,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Climb',
-          tabBarIcon: ({ color }) => <MountainIcon color={theme.secondary} size={24} />,
+          tabBarIcon: ({ color }) => <MountainIcon color={color} size={24} />,
         }}
       />
       <Tabs.Screen
@@ -75,7 +74,7 @@ export function AppText(props: TextProps) {
   return (
     <Text
       {...props}
-      style={[{ fontFamily: 'Trebuchet MS'}, props.style]}
+      style={[{ fontFamily: 'serif'}, props.style]}
     />
   );
 }

@@ -9,8 +9,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 // install 'lucide-react-native' and 'react-native-svg' first
-import { Mountain, MapPin, Play, Pause, RotateCcw, CircleX} from 'lucide-react-native';
-import { Background } from '@react-navigation/elements';
+import { Mountain, MapPin, Play, Pause, RotateCcw, CircleX, ChevronLeft} from 'lucide-react-native';
+//import { Background } from '@react-navigation/elements';
 
 // colors
 const theme = {
@@ -86,9 +86,16 @@ const Item = ({mountain}: {mountain: Mountain}) => (
 );
 //start button.
 const StartButton = ({ onPress }: { onPress: () => void }) => (
-    <TouchableOpacity style={styles.startButton} onPress={onPress}>
+    <TouchableOpacity style={styles.Button} onPress={onPress}>
       <Play color={theme.white} size={16} />
-      <AppText style={styles.startButtonText}>Start</AppText>
+      <AppText style={styles.ButtonText}>Start</AppText>
+    </TouchableOpacity>
+  );
+  //backbutton
+  const BackButton = ({ onPress }: { onPress: () => void }) => (
+    <TouchableOpacity style={styles.BackButton} onPress={onPress}>
+      <ChevronLeft color={theme.white} size={16} />
+      <AppText style={styles.BackButtonText}>Back</AppText>
     </TouchableOpacity>
   );
 //layout
@@ -97,31 +104,59 @@ function climbs() {
     return (
        //header with the title "Climbs"
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
+      {/*Page 1- starting page ('start')*/}
+      {page === 'start' && (
+        <View style={{ flex: 1 }}>
+        <View style={styles.headerPage1}>
           <AppText style={styles.title}>Climbs</AppText>
         </View>
-      {/*Page 1- starting page*/}
-      {page === 'start' && (
+
         <View style={styles.container}>
             <View style={{backgroundColor: theme.secondary}}>
                 <AppText style={styles.sectionTitle}>Start Your Journey to the Summit!</AppText>
             </View> 
-            <View style={{flex: 1, paddingHorizontal: 10, paddingTop: 5, backgroundColor: theme.secondary}}> 
+            <View style={styles.ButtonContainer}>
               <StartButton onPress={() => setPage('MountainList')} />
-                <AppText style={styles.label}>List of Mountains</AppText>
-                <FlatList
-                    data={dataList}
-                    keyExtractor={(item, index) => index.toString()}
-                    renderItem={({item}) => <Item mountain={item} />}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 4 }}
-                />
             </View>
+            <FlatList
+            data={dataList}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({item}) => <Item mountain={item} />}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          />
+        </View>
         </View>
       )}
-      </SafeAreaView>
+
+      {/*Page 2- list of mountains ('MountainList')*/}
+      {page === 'MountainList' && (
+        <View style={{ flex: 1 }}>
+          <View style={styles.headerPage2}>
+            <AppText style={styles.title}>Climbs</AppText>
+            </View>
+
+          {/* Back Button- move back to starting page */}
+          <View style={styles.BackButtonContainer}>
+            <BackButton onPress={() => setPage('start')} />
+          </View>
+
+          <AppText style={styles.label}>List of Mountains</AppText>
+
+          <FlatList
+            data={dataList}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({item}) => <Item mountain={item} />}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          />
+
+        </View>
+      )}
+    </SafeAreaView>
     );
-    }
+  }
+
 
 
 const styles = StyleSheet.create({
@@ -132,11 +167,13 @@ const styles = StyleSheet.create({
         backgroundColor: theme.secondary,
     },
     //Space around: "Climbs" title at the top of the screen
-    header: {
-        alignItems: 'flex-start',
-        marginBottom: 5,
-        marginTop: -30,
+    headerPage1: {
         marginLeft: 20,
+        marginTop: -40,
+    },
+    headerPage2: {
+      marginLeft: 20,
+      marginTop: -10, 
     },
     // Size, weight, color: "Climbs" title at the top of the screen
     title: {
@@ -188,6 +225,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 8,
+        marginLeft: 10,
+        marginRight: 10,
         backgroundColor: theme.white,
         borderRadius: 12,
         paddingHorizontal: 5,
@@ -200,11 +239,11 @@ const styles = StyleSheet.create({
         //android
         elevation: 3,
     },
-    //not used, but would be the left side of the mountain card (the text)
+    //not used, but would be the left side of the mountain card (the image)
     cardLeft: {
         flex: 1,
     },
-    //not used, but would be the right side of the mountain card (the image)
+    //not used, but would be the right side of the mountain card (the text)
     cardRight: {
       marginLeft: 10,
     },
@@ -225,19 +264,52 @@ const styles = StyleSheet.create({
         color: theme.background,
         marginTop: 4,
     },
-    startButton: {
+    //general button: start, pause/resume, startover, delete.
+    Button: {
         flexDirection: 'row',
         alignItems: 'center',
+        alignSelf: 'center',
         justifyContent: 'center',
         backgroundColor: theme.accent,
         paddingVertical: 10,
-        borderRadius: 8,
+        borderRadius: 35,
+        width: 80,
+        height: 80,
+        marginBottom: 10,
     },
-    startButtonText: {
+    //general button text: start, pause/resume, startover, delete.
+    ButtonText: {
         color: theme.white,
         fontSize: 16,
         fontWeight: 'bold',
-        marginLeft: 8,
+        paddingLeft: 8,
+    },
+     //position of back button.
+    ButtonContainer: {
+      alignItems: 'center', 
+    },
+    //visual style of back button
+    BackButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.accent,
+      borderRadius: 18,
+      paddingVertical: 6,
+      paddingHorizontal: 5,
+      alignSelf: 'flex-start',
+    },
+    //position of back button.
+    BackButtonContainer: {
+      position: 'absolute',
+      top: -50,
+      left: 15,
+
+    },
+    BackButtonText: {
+    color: theme.white,
+    fontSize: 16,
+    paddingLeft: 2,
+    paddingRight: 2,
     },
 });
 
