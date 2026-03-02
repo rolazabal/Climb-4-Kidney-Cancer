@@ -76,7 +76,7 @@ async def delete_user_progress(conn, user_id):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/progress_service"
+DBurl = "postgresql://postgres:admin@localhost:5432/progress_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -104,7 +104,7 @@ app = FastAPI(lifespan=lifespan)
 # ROUTES
 # ----------
 
-@app.post("/progress/")
+@app.post("/user-progress/")
 async def create_progress(user_id: uuid.UUID):
     async with app.state.pool.acquire() as conn:
         return await create_user_progress(conn, user_id)
@@ -112,7 +112,7 @@ async def create_progress(user_id: uuid.UUID):
         raise HTTPException(404, "User Progress not found")
     return dict(result)
 
-@app.get("/progress/{user_id}")
+@app.get("/user-progress/{user_id}")
 async def get_progress(user_id: uuid.UUID):
     async with app.state.pool.acquire() as conn:
         result = await read_user_progress(conn, user_id)
@@ -120,7 +120,7 @@ async def get_progress(user_id: uuid.UUID):
         raise HTTPException(404, "User Progress not found")
     return dict(result)
 
-@app.post("/progress/update/{user_id}")
+@app.post("/user-progress/update/{user_id}")
 async def update_progress(user_id: uuid.UUID, delta: ProgressDelta):
     async with app.state.pool.acquire() as conn:
         result = await apply_progress_update(
@@ -134,7 +134,7 @@ async def update_progress(user_id: uuid.UUID, delta: ProgressDelta):
         raise HTTPException(404, "User Progress not found")
     return dict(result)
 
-@app.delete("/progress/{user_id}")
+@app.delete("/user-progress/{user_id}")
 async def delete_progress(user_id: uuid.UUID):
     async with app.state.pool.acquire() as conn:
         result = await delete_user_progress(conn, user_id)
