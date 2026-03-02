@@ -1,4 +1,4 @@
-import {StyleSheet, ScrollView, Text, View, FlatList, TouchableOpacity} from 'react-native';
+import {StyleSheet, Text, View, FlatList, TouchableOpacity} from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from 'react';
 
@@ -125,7 +125,7 @@ function Mountains() {
 function MountainList({arr}) {
 
     const Item = ({mountain}) => (
-        <View style={[styles.item, {flex: 1, backgroundColor: theme.white}]}>
+        <View style={styles.item}>
             <View style={{flex: 1, padding: 10, backgroundColor: theme.primary, borderTopStartRadius: 10, borderTopEndRadius: 10}}>
                 <Text style={{fontSize: 24, color: theme.white}}>{mountain.name}</Text>
             </View>
@@ -176,6 +176,8 @@ const styles = StyleSheet.create({
         borderRadius: 10,
     },
     item: {
+        flex: 1,
+        backgroundColor: theme.white,
         marginBottom: 10,
         borderRadius: 10,
     }
