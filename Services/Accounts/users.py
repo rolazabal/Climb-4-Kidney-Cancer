@@ -99,7 +99,7 @@ async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/accounts_service"
+DBurl = "postgresql://postgres:admin@localhost:5432/accounts_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -109,6 +109,7 @@ async def lifespan(app: FastAPI):
         
         # enable UUID generation
         await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+        
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
                 uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -122,7 +123,7 @@ async def lifespan(app: FastAPI):
 
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_settings(
-                    user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    user_id uuid PRIMARY KEY REFERENCES users(uuid) ON DELETE CASCADE,
                     notification_on boolean NOT NULL DEFAULT true
                 )
         """)
@@ -157,10 +158,10 @@ async def add_user(users: User):
 
 # get user by id
 @app.get("/users/id/{user_id}")
-async def get_user(user_id: uuid.UUID):
+async def get_user(users_id: str):
 
     async with app.state.pool.acquire() as conn:
-        result = await read_user(conn, user_id)
+        result = await read_user(conn, users_id)
 
     if not result:
         raise HTTPException(404, "User not found")
@@ -181,7 +182,7 @@ async def get_user_by_name(username: str):
 
 # delete user entry
 @app.delete("/users/{users_id}")
-async def delete_user(users_id: uuid.UUID):
+async def delete_user(users_id: str):
     async with app.state.pool.acquire() as conn:
         result = await delete_user_db(conn, users_id)
 
