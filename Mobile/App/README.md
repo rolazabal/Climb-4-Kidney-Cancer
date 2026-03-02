@@ -25,6 +25,35 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Health data setup (Android + iOS)
+
+The app now includes health integrations in the Progress tab (`app/(tabs)/progress.tsx`) through a wrapper service (`services/health-connect.ts`):
+- Android: `react-native-health-connect`
+- iOS: `react-native-health` (Apple HealthKit)
+
+1. Install the package:
+
+   ```bash
+   npm install react-native-health-connect react-native-health
+   ```
+
+2. Build a development client (required for native modules):
+
+   ```bash
+   npx expo run:android
+   npx expo run:ios
+   ```
+
+3. Start Metro:
+
+   ```bash
+   npx expo start --dev-client
+   ```
+
+Notes:
+- Health integrations will not work in Expo Go because they require native modules.
+- iOS HealthKit permissions/entitlements are configured in `app.json` (`NSHealthShareUsageDescription`, `NSHealthUpdateUsageDescription`, and `com.apple.developer.healthkit` entitlement).
+
 ## Get a fresh project
 
 When you're ready, run:

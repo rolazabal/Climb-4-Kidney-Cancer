@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@/constants/theme";
 
@@ -105,6 +105,42 @@ function MountainsPage() {
     }
   };
 
+  const resetClimbProgress = (mountainId: string) => {
+    setInProgressMountains((current) =>
+      current.map((mountain) => (mountain.id === mountainId ? { ...mountain, progressFt: 0 } : mountain))
+    );
+  };
+
+  const confirmQuitClimb = (mountain: InProgressMountain) => {
+    Alert.alert(
+      "Quit Climb?",
+      `Are you sure you want to quit ${mountain.name}? This will reset any progress on this mountain.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Quit Climb",
+          style: "destructive",
+          onPress: () => quitClimb(mountain.id),
+        },
+      ]
+    );
+  };
+
+  const confirmResetClimb = (mountain: InProgressMountain) => {
+    Alert.alert(
+      "Reset Progress?",
+      `Are you sure you want to reset ${mountain.name}? This will set your progress to 0.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: () => resetClimbProgress(mountain.id),
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -176,7 +212,10 @@ function MountainsPage() {
                         {mountain.isPaused ? "Resume Climb" : "Pause Climb"}
                       </Text>
                     </Pressable>
-                    <Pressable style={styles.cardDangerButton} onPress={() => quitClimb(mountain.id)}>
+                    <Pressable style={styles.cardResetButton} onPress={() => confirmResetClimb(mountain)}>
+                      <Text style={styles.cardResetButtonText}>Reset Progress</Text>
+                    </Pressable>
+                    <Pressable style={styles.cardDangerButton} onPress={() => confirmQuitClimb(mountain)}>
                       <Text style={styles.cardDangerButtonText}>Quit Climb</Text>
                     </Pressable>
                   </View>
@@ -301,6 +340,20 @@ const styles = StyleSheet.create({
   },
   cardSecondaryButtonText: {
     color: c.heading,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  cardResetButton: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: c.icon,
+    height: 42,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cardResetButtonText: {
+    color: c.icon,
     fontSize: 14,
     fontWeight: "700",
   },
