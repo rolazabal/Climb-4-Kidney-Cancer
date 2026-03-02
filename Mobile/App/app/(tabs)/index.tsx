@@ -34,7 +34,7 @@ const dataList = [
     },
 ];
 
-const Item = ({ mountain }: { mountain: { name: string; location: string; peak: string } }) => (
+const Item = ({mountain}) => (
     <View style={[styles.item, {flexDirection: 'row', flex: 1, backgroundColor: 'powderblue'}]}>
         <View style={{flex: 5}}>
             <Text style={{fontSize: 24}}>{mountain.name}</Text>
