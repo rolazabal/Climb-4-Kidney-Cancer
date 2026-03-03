@@ -3,11 +3,14 @@
 import asyncpg
 import asyncio
 import uuid
+import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
 from datetime import date
 from enum import Enum
+
+from Services.config import USERS_SERVICE_URL, MOUNTAINS_SERVICE_URL # For http/ports
 
 
 # SCHEMA (Users)
@@ -270,6 +273,25 @@ async def delete_progress(user_id: uuid.UUID):
 
 @app.post("/progress")
 async def create_climb(climb: ClimbProgress):
+    
+    async with httpx.AsyncClient() as client:
+        
+        # Check if user exists
+        user_response = await client.get(
+            f"{USERS_SERVICE_URL}/users/id/{climb.user_id}"
+        )
+        if user_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Invalid User ID")
+        
+        # Check if mountain exists
+        mountain_response = await client.get(
+            f"{MOUNTAINS_SERVICE_URL}/mountains/{climb.mountain_id}"
+        )
+        if mountain_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Invalid Mountain ID")
+
+    
+    # Create Climb Progress after User/Mountain Verification
     async with app.state.pool.acquire() as conn:
         new_id = await create_climb_progress(
             conn,

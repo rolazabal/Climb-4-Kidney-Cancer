@@ -1,0 +1,5 @@
+USERS_SERVICE_URL = "http://localhost:8001"
+MOUNTAINS_SERVICE_URL = "http://localhost:8002"
+PROGRESS_SERVICE_URL = "http://localhost:8003"
+GROUPS_SERVICE_URL = "http://localhost:8004"
+EVENTS_SERVICE_URL = "http://localhost:8005"
