@@ -13,6 +13,8 @@ export type UserProfile = {
   username?: string | null;
   email?: string | null;
   bio?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
 };
 
 type Result = { success: true } | { success: false; error: string };
