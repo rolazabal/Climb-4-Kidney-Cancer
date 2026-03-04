@@ -26,6 +26,7 @@ import {
   validatePassword,
   validateBio,
 } from '@/lib/validation';
+import { Colors } from '@/constants/theme';
 
 const theme = {
   primary: 'rgb(51, 51, 51)',
@@ -378,7 +379,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.light.background,
   },
   keyboardView: {
     flex: 1,
@@ -399,10 +400,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 44,
+    fontWeight: "700",
     color: theme.primary,
-    marginBottom: 8,
+    marginBottom: 2,
   },
   subtitle: {
     fontSize: 16,
