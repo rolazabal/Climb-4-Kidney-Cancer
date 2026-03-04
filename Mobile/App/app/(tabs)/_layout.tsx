@@ -58,13 +58,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <User color={theme.secondary} size={24} />,
         }}
         />
-        <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <Settings color={theme.secondary} size={24} />,
-        }}
-        />
       </Tabs>
   );
 }
