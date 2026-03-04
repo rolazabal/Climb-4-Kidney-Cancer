@@ -66,7 +66,7 @@ async def read_user_progress(conn, user_id):
         return dict(row)
     else:
         raise HTTPException(404, "User not found")
-    
+
 async def apply_progress_update(conn, user_id, delta_height=0.0, delta_points=0, delta_mountains=0):
     row = await conn.fetchrow(
         """
@@ -88,7 +88,7 @@ async def delete_user_progress(conn, user_id):
         "DELETE FROM user_progress WHERE user_id=$1",
         user_id
     )
-    return row 
+    return row
 
 # Climb DB Functions
 
@@ -174,7 +174,7 @@ async def list_all_climbs(conn):
     return [dict(row) for row in rows]
 
 # --------------
-# LIFESPAN 
+# LIFESPAN
 # --------------
 
 DBurl = "postgresql://postgres:admin@localhost:5432/progress_service"
@@ -184,7 +184,7 @@ async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(DBurl)
     async with app.state.pool.acquire() as conn:
-        
+
         # Create enum type if it doesn't exist
         await conn.execute("""
             DO $$
@@ -194,7 +194,7 @@ async def lifespan(app: FastAPI):
                 END IF;
             END$$;
         """)
-        
+
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS climbs(
                 climb_uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -206,7 +206,7 @@ async def lifespan(app: FastAPI):
                 status climb_status NOT NULL DEFAULT 'active'
             );
         """)
-        
+
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_progress(
                 user_id uuid PRIMARY KEY,
@@ -248,10 +248,10 @@ async def get_progress(user_id: uuid.UUID):
 async def update_progress(user_id: uuid.UUID, delta: ProgressDelta):
     async with app.state.pool.acquire() as conn:
         result = await apply_progress_update(
-            conn, 
-            user_id, 
-            delta_height=delta.delta_height, 
-            delta_points=delta.delta_points, 
+            conn,
+            user_id,
+            delta_height=delta.delta_height,
+            delta_points=delta.delta_points,
             delta_mountains=delta.delta_mountains
         )
     if not result:

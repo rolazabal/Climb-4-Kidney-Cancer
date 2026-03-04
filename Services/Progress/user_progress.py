@@ -76,7 +76,7 @@ async def delete_user_progress(conn, user_id):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/progress_service"
+DBurl = "postgresql://postgres:219448602@localhost:5433/progress_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
