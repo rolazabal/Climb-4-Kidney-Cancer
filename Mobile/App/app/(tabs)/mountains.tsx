@@ -19,10 +19,15 @@ function Mountains() {
 
     async function getMoutains() {
         let res = await fetch(mountains_url, {
-            method: 'GET'
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
         });
-        let data = await res.json();
-        setMountains(data);
+        if (res.status === 200) {
+            let data = await res.json();
+            setMountains(data);
+        } else {
+            console.log(res.status.toString());
+        }
     }
 
     const mountainData = {

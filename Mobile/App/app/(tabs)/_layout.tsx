@@ -33,7 +33,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Climb',
+          title: 'Climbs',
           tabBarIcon: ({ color }) => <MountainIcon color={color} size={24} />,
         }}
       />
