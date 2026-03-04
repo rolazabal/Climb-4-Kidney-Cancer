@@ -33,7 +33,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Climb',
+          title: 'Climbs',
           tabBarIcon: ({ color }) => <MountainIcon color={color} size={24} />,
         }}
       />
@@ -56,13 +56,6 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => <User color={theme.secondary} size={24} />,
-        }}
-        />
-        <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <Settings color={theme.secondary} size={24} />,
         }}
         />
       </Tabs>

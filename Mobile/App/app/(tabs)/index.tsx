@@ -35,7 +35,7 @@ const initialInProgressMountains: InProgressMountain[] = [
   },
 ];
 
-function MountainsPage() {
+function Climbs() {
   const [isSelectingMountain, setIsSelectingMountain] = useState(false);
   const [availableMountains, setAvailableMountains] = useState(initialAvailableMountains);
   const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
@@ -377,4 +377,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MountainsPage;
+export default Climbs;
