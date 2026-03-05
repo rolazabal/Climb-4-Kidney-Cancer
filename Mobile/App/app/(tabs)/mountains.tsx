@@ -1,6 +1,7 @@
 import {StyleSheet, Text, View, FlatList, TouchableOpacity, Pressable} from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
@@ -20,6 +21,14 @@ function Mountains() {
     const summits = mountainsClimbed.length;
 
     const [mountains, setMountains] = useState(new Array());
+    const [peakNumber, setPeakNumber] = useState(0);
+
+    const Tabs = {
+        all: 0,
+        climbed: 1,
+        toClimb: 2
+    }
+    const [tab, setTab] = useState(Tabs.all);
 
     async function getMoutains() {
         let res = await fetch(mountains_url + "/mountains", {
@@ -47,11 +56,13 @@ function Mountains() {
                     for (let x in data) {
                         new_mountains.push(data[x]);
                     }
+                    setPeakNumber(new_mountains.length);
+                    setMountains(new_mountains);
                 })
                 .catch(error => {
                     console.log("Failed to get individual mountain data!");
-                });
-                setMountains(new_mountains);
+                }
+            );
         } else {
             console.log(res.status.toString());
         }
@@ -95,17 +106,12 @@ function Mountains() {
     };
     */
 
-    const Tabs = {
-        all: 0,
-        climbed: 1,
-        toClimb: 2
-    }
-    const [tab, setTab] = useState(Tabs.climbed);
-
     // load mountain data on page mount
-    useEffect(() => {
-        getMoutains();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            getMoutains();
+        }, [])
+    );
 
     return (
         <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
@@ -130,7 +136,7 @@ function Mountains() {
                     <View style={{flex: 1}}></View>
                     <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.all)}>
                         <Text style={[styles.label, {color: theme.accent}]}>
-                            {mountains.length}
+                            {peakNumber}
                         </Text>
                         <Text style={styles.small}>
                             Total peaks
