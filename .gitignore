@@ -35,6 +35,7 @@ android/
 # Python (you have .venv)
 .venv/
 __pycache__/
+Services/Mountains/venv/
 
 # VSCode
 .vscode/
