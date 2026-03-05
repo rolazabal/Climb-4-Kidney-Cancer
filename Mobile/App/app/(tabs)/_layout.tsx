@@ -1,11 +1,16 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Text, TextProps } from 'react-native';
+
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-/*
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Play, Pause, RotateCcw, Flag, Mountain as MountainIcon, Trophy } from 'lucide-react-native';
+import { TrendingUp, Map, Settings, User, LucideIcon } from 'lucide-react-native'; //for navigation bar
+import { Text, TextProps } from 'react-native';
+
+
 const theme = {
   primary: 'rgb(51, 51, 51)',
   secondary: 'rgb(102, 102, 101)',
@@ -14,66 +19,55 @@ const theme = {
   background: '#F9FAFB',
   white: '#FFFFFF',
 };
-*/
+
 export default function TabLayout() {
-  const theme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme();
 
   return (
     <Tabs
       screenOptions={{
+        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarActiveTintColor: Colors[theme].tabIconSelected,
-        tabBarInactiveTintColor: Colors[theme].tabIconDefault,
-        tabBarStyle: {
-          backgroundColor: Colors[theme].surface,
-          borderTopColor: Colors[theme].border,
-        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Climbs',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          tabBarIcon: ({ color }) => <MountainIcon color={color} size={24} />,
         }}
       />
       <Tabs.Screen
-        name="mountains"
-        options={{
-          title: 'Mountains',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="mountain.2.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
-        }}
-        />
-        <Tabs.Screen
         name="progress"
         options={{
           title: 'Progress',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          tabBarIcon: ({ color }) => <TrendingUp color={theme.secondary} size={24} />,
         }}
         />
-    </Tabs>
+        <Tabs.Screen
+        name="mountains"
+        options={{
+          title: 'Mountains',
+          tabBarIcon: ({ color }) => <Map color={theme.secondary} size={24} />,
+        }}
+        />
+        <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <User color={theme.secondary} size={24} />,
+        }}
+        />
+      </Tabs>
   );
 }
 
+// Global AppText component (use this instead of Text across the app)
 export function AppText(props: TextProps) {
   return (
     <Text
       {...props}
-      style={[{ fontFamily: 'Trebuchet MS'}, props.style]}
+      style={[{ fontFamily: 'serif'}, props.style]}
     />
   );
 }

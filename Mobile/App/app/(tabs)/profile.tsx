@@ -96,18 +96,6 @@ function ProfilePage() {
             <Text style={styles.achievementsText}>No achievements yet</Text>
           </View>
 
-          <Pressable
-            style={styles.editButton}
-            onPress={() =>
-              router.push({
-                pathname: "/edit-profile",
-                params: { username, email },
-              })
-            }
-          >
-            <Ionicons name="create-outline" size={18} color={c.onPrimary} />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </>

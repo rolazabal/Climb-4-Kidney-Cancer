@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "example",
-    "slug": "example",
+    "name": "App",
+    "slug": "App",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "example",
+    "scheme": "app",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -30,7 +30,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.App"
     },
     "web": {
       "output": "static",
