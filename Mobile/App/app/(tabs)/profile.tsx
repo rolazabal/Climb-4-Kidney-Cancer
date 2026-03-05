@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from "@/constants/theme";
 
 type StatItem = {
   id: string;
@@ -22,8 +24,9 @@ const stats: StatItem[] = [
   { id: "3", icon: "locate-outline", label: "Total Elevation (ft)", value: 0 },
   { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: 0 },
 ];
+const c = Colors.light;
 
-function profile_page() {
+function ProfilePage() {
   const params = useLocalSearchParams<{ username?: string; email?: string }>();
   const username =
     typeof params.username === "string" && params.username.trim().length > 0
@@ -37,74 +40,64 @@ function profile_page() {
   return (
     <>
       <Stack.Screen options={{ title: "Profile", headerShadowVisible: false }} />
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <Text style={styles.pageTitle}>Profile</Text>
-        <Text style={styles.pageSubtitle}>Your climbing journey</Text>
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+          <Text style={styles.pageTitle}>Profile</Text>
+          <Text style={styles.pageSubtitle}>Your climbing journey</Text>
 
-        <View style={styles.profileCard}>
-          <View style={styles.banner} />
-          <View style={styles.avatar}>
-            <Ionicons name="person-outline" size={36} color="#FFFFFF" />
-          </View>
-          <Text style={styles.username}>{username}</Text>
-          <Text style={styles.email}>{email}</Text>
+          <View style={styles.profileCard}>
+            <View style={styles.banner} />
+            <View style={styles.avatar}>
+              <Ionicons name="person-outline" size={36} color={c.onPrimary} />
+            </View>
+            <Text style={styles.username}>{username}</Text>
+            <Text style={styles.email}>{email}</Text>
 
-          <View style={styles.streakGrid}>
-            <View style={[styles.streakCard, styles.streakCardWarm]}>
-              <Ionicons name="flame-outline" size={24} color="#CD6542" />
-              <View>
-                <Text style={styles.streakValue}>{profile.currentStreak}</Text>
-                <Text style={styles.streakLabel}>Current Streak</Text>
+            <View style={styles.streakGrid}>
+              <View style={[styles.streakCard, styles.streakCardWarm]}>
+                <Ionicons name="flame-outline" size={24} color={c.tint} />
+                <View>
+                  <Text style={styles.streakValue}>{profile.currentStreak}</Text>
+                  <Text style={styles.streakLabel}>Current Streak</Text>
+                </View>
+              </View>
+              <View style={[styles.streakCard, styles.streakCardCool]}>
+                <Ionicons name="calendar-outline" size={24} color={c.icon} />
+                <View>
+                  <Text style={styles.streakValue}>{profile.longestStreak}</Text>
+                  <Text style={styles.streakLabel}>Longest Streak</Text>
+                </View>
               </View>
             </View>
-            <View style={[styles.streakCard, styles.streakCardCool]}>
-              <Ionicons name="calendar-outline" size={24} color="#6C6C6C" />
-              <View>
-                <Text style={styles.streakValue}>{profile.longestStreak}</Text>
-                <Text style={styles.streakLabel}>Longest Streak</Text>
-              </View>
-            </View>
           </View>
-        </View>
 
-        <View style={styles.sectionHeader}>
-          <Ionicons name="trending-up-outline" size={18} color="#C76341" />
-          <Text style={styles.sectionTitle}>Statistics</Text>
-        </View>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="trending-up-outline" size={18} color={c.tint} />
+            <Text style={styles.sectionTitle}>Statistics</Text>
+          </View>
 
-        <View style={styles.statsGrid}>
-          {stats.map((item) => (
-            <View key={item.id} style={styles.statCard}>
-              <Ionicons name={item.icon} size={28} color="#C76341" />
-              <Text style={styles.statValue}>{item.value}</Text>
-              <Text style={styles.statLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
+          <View style={styles.statsGrid}>
+            {stats.map((item) => (
+              <View key={item.id} style={styles.statCard}>
+                <Ionicons name={item.icon} size={28} color={c.tint} />
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
 
-        <View style={styles.sectionHeader}>
-          <Ionicons name="ribbon-outline" size={18} color="#C76341" />
-          <Text style={styles.sectionTitle}>Achievements</Text>
-        </View>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="ribbon-outline" size={18} color={c.tint} />
+            <Text style={styles.sectionTitle}>Achievements</Text>
+          </View>
 
-        <View style={styles.achievementsCard}>
-          <Ionicons name="ellipse-outline" size={38} color="#CACACA" />
-          <Text style={styles.achievementsText}>No achievements yet</Text>
-        </View>
+          <View style={styles.achievementsCard}>
+            <Ionicons name="ellipse-outline" size={38} color={c.tabIconDefault} />
+            <Text style={styles.achievementsText}>No achievements yet</Text>
+          </View>
 
-        <Pressable
-          style={styles.editButton}
-          onPress={() =>
-            router.push({
-              pathname: "/edit-profile",
-              params: { username, email },
-            })
-          }
-        >
-          <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-          <Text style={styles.editButtonText}>Edit Profile</Text>
-        </Pressable>
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
     </>
   );
 }
@@ -112,7 +105,7 @@ function profile_page() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#ECEDEE",
+    backgroundColor: c.background,
   },
   content: {
     padding: 16,
@@ -121,19 +114,19 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 44,
     fontWeight: "700",
-    color: "#2F2F2F",
+    color: c.heading,
     marginBottom: 2,
   },
   pageSubtitle: {
     fontSize: 24,
-    color: "#666666",
+    color: c.subtitle,
     marginBottom: 14,
   },
   profileCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderRadius: 16,
     overflow: "hidden",
-    shadowColor: "#0E1A18",
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -145,29 +138,29 @@ const styles = StyleSheet.create({
   banner: {
     height: 112,
     width: "100%",
-    backgroundColor: "#4D4D4D",
+    backgroundColor: c.banner,
   },
   avatar: {
     width: 92,
     height: 92,
     borderRadius: 46,
-    backgroundColor: "#C76341",
+    backgroundColor: c.tint,
     justifyContent: "center",
     alignItems: "center",
     marginTop: -46,
     borderWidth: 4,
-    borderColor: "#F5F5F5",
+    borderColor: c.background,
     marginBottom: 10,
   },
   username: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#4A4A4A",
+    color: c.text,
     marginBottom: 4,
   },
   email: {
     fontSize: 14,
-    color: "#8A8A8A",
+    color: c.icon,
     marginBottom: 12,
   },
   streakGrid: {
@@ -185,21 +178,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   streakCardWarm: {
-    backgroundColor: "#EFE8E1",
+    backgroundColor: c.surfaceWarm,
   },
   streakCardCool: {
-    backgroundColor: "#F1F2F4",
+    backgroundColor: c.surfaceMuted,
   },
   streakValue: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#333333",
+    color: c.heading,
     lineHeight: 22,
   },
   streakLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#6E6E6E",
+    color: c.icon,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -210,7 +203,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#2F2F2F",
+    color: c.heading,
   },
   statsGrid: {
     flexDirection: "row",
@@ -221,11 +214,11 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: "48.5%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderRadius: 14,
     paddingVertical: 20,
     alignItems: "center",
-    shadowColor: "#0E1A18",
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -235,23 +228,23 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 40,
     fontWeight: "700",
-    color: "#303030",
+    color: c.heading,
   },
   statLabel: {
     marginTop: 4,
     fontSize: 14,
-    color: "#666666",
+    color: c.subtitle,
     textAlign: "center",
     fontWeight: "600",
   },
   achievementsCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderRadius: 16,
     minHeight: 130,
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: "#0E1A18",
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -259,12 +252,12 @@ const styles = StyleSheet.create({
   },
   achievementsText: {
     fontSize: 14,
-    color: "#9A9A9A",
+    color: c.tabIconDefault,
     fontWeight: "600",
   },
   editButton: {
     marginTop: 14,
-    backgroundColor: "#C76341",
+    backgroundColor: c.tint,
     borderRadius: 12,
     height: 48,
     alignItems: "center",
@@ -273,10 +266,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   editButtonText: {
-    color: "#FFFFFF",
+    color: c.onPrimary,
     fontSize: 16,
     fontWeight: "700",
   },
 });
 
-export default profile_page;
+export default ProfilePage;
