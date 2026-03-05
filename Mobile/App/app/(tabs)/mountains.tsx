@@ -1,4 +1,4 @@
-import {StyleSheet, Text, View, FlatList, TouchableOpacity} from 'react-native';
+import {StyleSheet, Text, View, FlatList, TouchableOpacity, Pressable} from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect } from 'react';
 
@@ -13,23 +13,51 @@ const theme = {
 
 function Mountains() {
 
-    const mountains_url = "http://127.0.0.1:8000";
+    const mountains_url = "http://10.0.2.2:8000";
 
-    const [mountains, setMountains] = useState(null);
+    const mountainsClimbed = new Array();
+
+    const summits = mountainsClimbed.length;
+
+    const [mountains, setMountains] = useState(new Array());
 
     async function getMoutains() {
-        let res = await fetch(mountains_url, {
+        let res = await fetch(mountains_url + "/mountains", {
             method: 'GET',
             headers: {'Content-Type': 'application/json'},
         });
         if (res.status === 200) {
             let data = await res.json();
-            setMountains(data);
+            let promises = [];
+            // create array of promise fetch requests for each mountain's data
+            for (let x in data) {
+                let req_str = mountains_url + "/mountains/" + data[x].uuid;
+                promises.push(fetch(req_str, {
+                    method: 'GET',
+                    headers: {'Content-Type': 'application/json'},
+                }));
+            }
+            let new_mountains = new Array();
+            // resolve each promise in the array
+            Promise.all(promises)
+                // map each response to data array with json contents
+                .then(res_arr => Promise.all(res_arr.map(res => res.json())))
+                .then(data => {
+                    // append mountain data to mountains list
+                    for (let x in data) {
+                        new_mountains.push(data[x]);
+                    }
+                })
+                .catch(error => {
+                    console.log("Failed to get individual mountain data!");
+                });
+                setMountains(new_mountains);
         } else {
             console.log(res.status.toString());
         }
     }
 
+    /* old mock data
     const mountainData = {
         mountainsClimbed: [],
         mountainsToClimb: [
@@ -65,9 +93,7 @@ function Mountains() {
             },
         ]
     };
-
-    const summits = mountainData.mountainsClimbed.length;
-    const totalPeaks = summits + mountainData.mountainsToClimb.length;
+    */
 
     const Tabs = {
         all: 0,
@@ -76,10 +102,9 @@ function Mountains() {
     }
     const [tab, setTab] = useState(Tabs.climbed);
 
+    // load mountain data on page mount
     useEffect(() => {
-        if (mountains === null) {
-            getMoutains();
-        }
+        getMoutains();
     }, []);
 
     return (
@@ -94,23 +119,23 @@ function Mountains() {
                     </Text>
                 </View>
                 <View style={{flex: 2, marginVertical: 10, flexDirection: 'row'}}>
-                    <View style={styles.info}>
+                    <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.climbed)}>
                         <Text style={[styles.label, {color: theme.accent}]}>
                             {summits}
                         </Text>
                         <Text style={styles.small}>
                             Summits
                         </Text>
-                    </View>
+                    </TouchableOpacity>
                     <View style={{flex: 1}}></View>
-                    <View style={styles.info}>
+                    <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.all)}>
                         <Text style={[styles.label, {color: theme.accent}]}>
-                            {totalPeaks}
+                            {mountains.length}
                         </Text>
                         <Text style={styles.small}>
                             Total peaks
                         </Text>
-                    </View>
+                    </TouchableOpacity>
                 </View>
                 <View style={{flex: 1, marginBottom: 10, flexDirection: 'row'}}>
                     <TouchableOpacity style={[styles.tab, tab === Tabs.all && {backgroundColor: theme.accent}]} onPress={() => setTab(Tabs.all)}>
@@ -135,7 +160,7 @@ function Mountains() {
                     <MountainList arr={mountains} />
                 }
                 {tab === Tabs.climbed &&
-                    <MountainList arr={mountains} />
+                    <MountainList arr={mountainsClimbed} />
                 }
                 {tab === Tabs.toClimb &&
                     <MountainList arr={mountains} />
@@ -148,19 +173,19 @@ function Mountains() {
 function MountainList({arr}) {
 
     const Item = ({mountain}) => (
-        <View style={styles.item}>
-            <View style={{flex: 1, padding: 10, backgroundColor: theme.primary, borderTopStartRadius: 10, borderTopEndRadius: 10}}>
+        <TouchableOpacity style={styles.item} id={mountain.uuid}>
+            <View style={{flex: 1, padding: 15, backgroundColor: theme.primary, borderTopStartRadius: 10, borderTopEndRadius: 10}}>
                 <Text style={{fontSize: 24, color: theme.white}}>{mountain.name}</Text>
             </View>
-            <View style={{flex: 3, padding: 10}}>
+            <View style={{flex: 3, padding: 15}}>
                 <Text style={{fontSize: 18, color: theme.secondary}}>{mountain.location}</Text>
-                <Text style={{fontSize: 18, color: theme.secondary}}>{mountain.peak}</Text>
+                <Text style={{fontSize: 18, color: theme.secondary}}>{mountain.height} ft</Text>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 
     const EmptyItem = (
-        <View style={styles.item}>
+        <View style={[styles.item, {padding: 20}]}>
             <Text style={styles.small}>
                 No mountains under this category.
             </Text>
@@ -179,7 +204,7 @@ function MountainList({arr}) {
 const styles = StyleSheet.create({
     label: {
         textAlign: 'center',
-        fontSize: 32,
+        fontSize: 44,
     },
     small: {
         textAlign: 'center',
