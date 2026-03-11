@@ -1,4 +1,14 @@
-# IMPORTS
+## IMPORTS
+import boto3
+import os
+
+S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
+S3_REGION = os.getenv("S3_REGION", "us-east-2")
+
+s3 = boto3.client("s3", region_name=S3_REGION)
+
+USER_PREFIX = "UserImages/"
+
 # type "fastapi dev users.py" in console to run
 from datetime import date
 import asyncpg
@@ -18,6 +28,13 @@ class User(BaseModel):
     bio: str | None = None
     profile_photo_media_id: str | None = None
 
+class UserPatch(BaseModel):
+    email: str | None = None
+    username: str | None = None
+    dob: date | None = None
+    bio: str | None = None
+    profile_photo_media_id: str | None = None
+
 class UserSettings(BaseModel):
     user_id: uuid.UUID
     notification_on: bool
@@ -27,7 +44,18 @@ class UserSettings(BaseModel):
 # DB Functions (CRUD)
 # --------------------
 
-#async def get_connection():
+def presigned_get_url(key: str, expires_seconds: int = 3600) -> str:
+    return s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": S3_BUCKET, "Key": key},
+        ExpiresIn=expires_seconds,
+    )
+
+def to_user_key(filename_or_key: str) -> str:
+    # If DB already contains a full key, keep it
+    if filename_or_key.startswith(USER_PREFIX):
+        return filename_or_key
+    return USER_PREFIX + filename_or_key
 
 async def create_user(conn, email, username, dob, bio = None, profile_photo_media_id = None):
     row = await conn.fetchrow('''
@@ -99,7 +127,7 @@ async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/accounts_service"
+DBurl = "postgresql://summit_admin:admin0415@localhost:5432/accounts_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -193,9 +221,8 @@ async def delete_user(users_id: str):
 
 # update user entry
 @app.patch("/users/{users_id}")
-async def patch_user(users_id: str, patch: dict = Body(...)):
-    allowed = {"email", "username", "dob", "bio", "profile_photo_media_id"}
-    data = {k: v for k, v in patch.items() if k in allowed and v is not None}
+async def patch_user(users_id: str, patch: UserPatch):
+    data = patch.model_dump(exclude_unset=True, exclude_none=True)
     if "url" in data:
         data["image_url"] = data.pop("url")
 
@@ -204,7 +231,6 @@ async def patch_user(users_id: str, patch: dict = Body(...)):
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
-    return {"message": "User updated"}
 
 # get all users
 @app.get("/users")
@@ -227,3 +253,17 @@ async def toggle(user_id: uuid.UUID, notification_on: bool = Body(...)):
         raise HTTPException(404, "User not found")
 
     return {"message": "Notification setting updated"}
+
+@app.get("/users/{user_id}/profile_photo_media_id")
+async def get_user_image_url(user_id: str):
+    async with app.state.pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT profile_photo_media_id FROM users WHERE uuid=$1::uuid",
+            user_id
+        )
+    if not row or not row["profile_photo_media_id"]:
+        raise HTTPException(404, "Image not found")
+    
+    # DB stores filename like "user123photo.jpg"
+    key = to_user_key(row["profile_photo_media_id"])  # -> "UserImages/user123photo.jpg"
+    return {"url": presigned_get_url(key)}
