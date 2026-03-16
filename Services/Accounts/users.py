@@ -1,6 +1,7 @@
 # IMPORTS
 # type "fastapi dev users.py" in console to run
 from datetime import date
+import os
 import asyncpg
 import asyncio
 import uuid
@@ -100,7 +101,11 @@ async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@users-db:5432/accounts_service"
+DB_USER = os.getenv("POSTGRES_USER")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+
+DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@users-db:5432/accounts_service"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

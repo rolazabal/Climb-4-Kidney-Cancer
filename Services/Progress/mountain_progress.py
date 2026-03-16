@@ -1,5 +1,6 @@
 # IMPORTS
 # type "fastapi dev mountains.py" in console to run
+import os
 import asyncpg
 import asyncio
 import uuid
@@ -180,7 +181,10 @@ async def list_all_climbs(conn):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@progress-db:5432/progress_service"
+DB_USER = os.getenv("POSTGRES_USER")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+
+DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@progress-db:5432/progress_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
