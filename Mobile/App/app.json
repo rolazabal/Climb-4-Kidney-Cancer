@@ -16,7 +16,8 @@
       },
       "entitlements": {
         "com.apple.developer.healthkit": true
-      }
+      },
+      "bundleIdentifier": "com.anonymous.App"
     },
     "android": {
       "permissions": [
