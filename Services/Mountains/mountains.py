@@ -152,7 +152,7 @@ async def get_mountains():
 
 # delete mountain entry
 @app.delete("/mountains/{mountain_id}")
-async def delete_mountain(mountain_id: str):
+async def remove_mountain(mountain_id: str):
     async with app.state.pool.acquire() as conn:
         result = await delete_mountain(conn, mountain_id)
 
