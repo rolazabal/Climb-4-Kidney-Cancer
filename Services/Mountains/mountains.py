@@ -87,7 +87,7 @@ async def list_mountains(conn):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/mountains_service"
+DBurl = "postgresql://postgres:admin@mountains-db:5432/mountains_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

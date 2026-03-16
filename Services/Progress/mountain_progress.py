@@ -180,7 +180,7 @@ async def list_all_climbs(conn):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/progress_service"
+DBurl = "postgresql://postgres:admin@progress-db:5432/progress_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+
+  users-service:
+    build: .
+    command: uvicorn Services.Accounts.users:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8001:8000"
+    depends_on:
+      users-db:
+        condition: service_healthy
+
+  mountains-service:
+    build: .
+    command: uvicorn Services.Mountains.mountains:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8002:8000"
+    depends_on:
+      mountains-db:
+        condition: service_healthy
+
+  progress-service:
+    build: .
+    command: uvicorn Services.Progress.mountain_progress:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8003:8000"
+    depends_on:
+      progress-db:
+        condition: service_healthy
+
+  users-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: accounts_service
+    ports:
+      - "5432:5432"
+    volumes:
+      - users_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mountains-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: mountains_service
+    ports:
+      - "5433:5432"
+    volumes:
+      - mountains_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  progress-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: progress_service
+    ports:
+      - "5434:5432"
+    volumes:
+      - progress_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  users_data:
+  mountains_data:
+  progress_data:

@@ -100,7 +100,7 @@ async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/accounts_service"
+DBurl = "postgresql://postgres:admin@users-db:5432/accounts_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
