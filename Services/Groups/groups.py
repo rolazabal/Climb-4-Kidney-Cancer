@@ -1,11 +1,287 @@
 # IMPORTS
 # type "fastapi dev mountains.py" in console to run
 import asyncpg
-import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
-from datetime import date
-from enum import Enum
+from datetime import datetime
+from typing import Optional
 
+# --------------------
+# SCHEMAS
+# --------------------
+
+class Group(BaseModel):
+    name: str
+    created_by: uuid.UUID
+    created_at: Optional[datetime] = None
+
+class Group_Members(BaseModel):
+    role: str
+
+
+# --------------------
+# DB Functions (CRUD) - GROUPS
+# --------------------
+
+async def create_group(conn, name, created_by):
+    row = await conn.fetchrow(
+        """
+        INSERT INTO groups(name, created_by)
+        VALUES($1, $2)
+        RETURNING group_id
+        """,
+        name,
+        created_by,
+    )
+    return dict(row)
+
+async def update_group(conn, group_id: str, name=None):
+    element_updates = {}
+    if name is not None:
+        element_updates["name"] = name
+    if not element_updates:
+        return "UPDATE 0"  # or raise ValueError / HTTPException
+
+    set_clause = ", ".join(
+        f"{col} = ${i}" for i, col in enumerate(element_updates.keys(), start=1)
+    )
+    query = f"UPDATE groups SET {set_clause} WHERE group_id = ${len(element_updates) + 1}"
+
+    values = list(element_updates.values()) + [group_id]
+    return await conn.execute(query, *values)
+
+async def delete_group(conn, group_id):
+    return await conn.execute(
+        """
+        DELETE FROM groups WHERE group_id = $1
+        """,
+        group_id,
+    )
+
+async def get_group(conn, group_id):
+    row = await conn.fetchrow(
+        """
+        SELECT * FROM groups WHERE group_id = $1
+        """,
+        group_id,
+    )
+
+    if row:
+        return dict(row)
+    raise HTTPException(404, "Group not found")
+
+async def list_groups(conn):
+    rows = await conn.fetch(
+        """SELECT * FROM groups"""
+    )
+    return [dict(row) for row in rows]
+
+
+# --------------------
+# DB Functions (CRUD) - GROUP MEMBERS
+# --------------------
+
+async def add_member(conn, group_id, user_id, role):
+    row = await conn.fetchrow("""
+        INSERT INTO group_members(group_id, user_id, role)
+        VALUES($1, $2, $3)
+        RETURNING group_id, user_id, role""",
+        group_id,user_id,role,
+    )
+    return dict(row)
+
+async def update_member_role(conn, group_id, user_id, new_role):
+    result = await conn.execute("""
+        UPDATE group_members
+        SET role = $1
+        WHERE group_id = $2 AND user_id = $3""",
+        new_role,group_id,user_id,
+    )
+    return result
+
+async def remove_member(conn, group_id, user_id):
+    result = await conn.execute("""
+        DELETE FROM group_members
+        WHERE group_id = $1 AND user_id = $2""",
+        group_id,
+        user_id,
+    )
+    return result
+
+async def list_group_members(conn, group_id):
+    rows = await conn.fetch("""
+        SELECT user_id, role
+        FROM group_members
+        WHERE group_id = $1""",
+        group_id,
+    )
+    return [dict(row) for row in rows]
+
+async def get_member_role(conn, group_id, user_id):
+    row = await conn.fetchrow("""
+        SELECT role
+        FROM group_members
+        WHERE group_id = $1 AND user_id = $2""",
+        group_id,
+        user_id,
+    )
+
+    if row:
+        return row["role"]
+    raise HTTPException(404, "Member not found in group")
+
+
+# --------------
+# LIFESPAN
+# --------------
+
+DBurl = "postgresql://summit_admin:admin0415@localhost:5432/groups_service"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.pool = await asyncpg.create_pool(DBurl)
+
+    async with app.state.pool.acquire() as conn:
+        await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+
+        # Create groups table
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS groups (
+                group_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                name varchar(255) UNIQUE NOT NULL,
+                created_by uuid NOT NULL,
+                created_at timestamp DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        # Create enum type for roles (Leader/Member only; removed High)
+        await conn.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'group_role') THEN
+                    CREATE TYPE group_role AS ENUM ('Leader', 'Member');
+                END IF;
+            END$$;
+            """
+        )
+
+        # Create group_members table
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS group_members (
+                group_id uuid REFERENCES groups(group_id) ON DELETE CASCADE,
+                user_id uuid NOT NULL,
+                role group_role NOT NULL DEFAULT 'Member',
+                PRIMARY KEY (group_id, user_id)
+            );
+            """
+        )
+
+    yield
+    await app.state.pool.close()
+
+app = FastAPI(lifespan=lifespan)
+
+
+# ----------
+# ROUTES - GROUPS
+# ----------
+
+@app.post("/groups/")
+async def make_group(group: Group):
+    """
+    Requirement:
+    - Creator is automatically added to group_members with role = 'Leader'
+    """
+    async with app.state.pool.acquire() as conn:
+        async with conn.transaction():
+            new_id = await create_group(conn, group.name, group.created_by)
+            group_id = new_id["group_id"]
+
+            # Set creator as Leader by default
+            await add_member(conn, group_id, group.created_by, "Leader")
+
+    return {"message": "Group created successfully", "id": new_id}
+
+@app.get("/groups/{group_id}")
+async def read_group(group_id: uuid.UUID):
+    async with app.state.pool.acquire() as conn:
+        result = await get_group(conn, group_id)
+    return {"message": "Group retrieved successfully", "group": result}
+
+@app.get("/groups/")
+async def read_groups():
+    async with app.state.pool.acquire() as conn:
+        groups = await list_groups(conn)
+    return groups
+
+@app.put("/groups/{group_id}")
+async def update_group_info(group_id: uuid.UUID, name: str = Body(None)):
+    async with app.state.pool.acquire() as conn:
+        result = await update_group(conn, group_id, name)
+    if result == "UPDATE 0":
+        raise HTTPException(404, "Group not found")
+    return {"message": "Group updated successfully"}
+
+@app.delete("/groups/{group_id}")
+async def remove_group(group_id: uuid.UUID):
+    async with app.state.pool.acquire() as conn:
+        result = await delete_group(conn, group_id)
+    if result == "DELETE 0":
+        raise HTTPException(404, "Group not found")
+    return {"message": "Group deleted successfully"}
+
+
+# ----------
+# ROUTES - GROUP MEMBERS
+# ----------
+
+@app.post("/groups/{group_id}/members/")
+async def add_group_member(group_id: uuid.UUID,user_id: uuid.UUID,):
+    """
+    Requirement:
+    - Any user added to an existing group is role = 'Member' by default
+    (Role is NOT accepted from the client in this endpoint.)
+    """
+    async with app.state.pool.acquire() as conn:
+        member_added = await add_member(conn, group_id, user_id, "Member")
+    return member_added
+
+@app.get("/groups/{group_id}/members/")
+async def get_group_members(group_id: uuid.UUID):
+    async with app.state.pool.acquire() as conn:
+        members = await list_group_members(conn, group_id)
+    return members
+
+@app.put("/groups/{group_id}/members/{user_id}")
+async def update_group_member_role(
+    group_id: uuid.UUID,
+    user_id: uuid.UUID,
+    new_role: str = Body(..., embed=True),
+):
+    # Only allow the two roles we support now
+    if new_role not in ("Leader", "Member"):
+        raise HTTPException(400, "Invalid role. Must be 'Leader' or 'Member'.")
+
+    async with app.state.pool.acquire() as conn:
+        result = await update_member_role(conn, group_id, user_id, new_role)
+
+    if result == "UPDATE 0":
+        raise HTTPException(404, "Member not found in group")
+
+    return {"message": "Member role updated successfully"}
+
+@app.delete("/groups/{group_id}/members/{user_id}")
+async def delete_group_member(group_id: uuid.UUID, user_id: uuid.UUID):
+    async with app.state.pool.acquire() as conn:
+        result = await remove_member(conn, group_id, user_id)
+
+    if result == "DELETE 0":
+        raise HTTPException(404, "Member not found in group")
+
+    return {"message": "Member removed from group successfully"}
