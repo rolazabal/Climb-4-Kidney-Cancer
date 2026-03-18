@@ -10,13 +10,15 @@ s3 = boto3.client("s3", region_name=S3_REGION)
 MOUNTAIN_PREFIX = "MountainsImages/"
 
 # type "fastapi dev mountains.py" in console to run
+import os
 import asyncpg
 import asyncio
 import uuid
+import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
-
+from Services.config import PROGRESS_SERVICE_URL
 
 
 # SCHEMA
@@ -115,8 +117,10 @@ async def list_mountains(conn):
 # --------------
 # LIFESPAN 
 # --------------
+DB_USER = os.getenv("POSTGRES_USER")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/mountains_service"
+DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@mountains-db:5432/mountains_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

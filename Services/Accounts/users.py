@@ -11,13 +11,15 @@ USER_PREFIX = "UserImages/"
 
 # type "fastapi dev users.py" in console to run
 from datetime import date
+import os
 import asyncpg
 import asyncio
 import uuid
+import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
-
+from Services.config import PROGRESS_SERVICE_URL
 
 
 # SCHEMA
@@ -127,7 +129,11 @@ async def toggle_notification(conn, user_id: uuid.UUID, notification_on: bool):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/accounts_service"
+DB_USER = os.getenv("POSTGRES_USER")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+
+DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@users-db:5432/accounts_service"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -186,10 +192,10 @@ async def add_user(users: User):
 
 # get user by id
 @app.get("/users/id/{user_id}")
-async def get_user(users_id: str):
+async def get_user(user_id: uuid.UUID):
 
     async with app.state.pool.acquire() as conn:
-        result = await read_user(conn, users_id)
+        result = await read_user(conn, user_id)
 
     if not result:
         raise HTTPException(404, "User not found")
@@ -209,10 +215,10 @@ async def get_user_by_name(username: str):
 
 
 # delete user entry
-@app.delete("/users/{users_id}")
-async def delete_user(users_id: str):
+@app.delete("/users/{user_id}")
+async def delete_user(user_id: uuid.UUID):
     async with app.state.pool.acquire() as conn:
-        result = await delete_user_db(conn, users_id)
+        result = await delete_user_db(conn, user_id)
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
@@ -221,13 +227,13 @@ async def delete_user(users_id: str):
 
 # update user entry
 @app.patch("/users/{users_id}")
-async def patch_user(users_id: str, patch: UserPatch):
+async def patch_user(user_id: uuid.UUID, patch: UserPatch):
     data = patch.model_dump(exclude_unset=True, exclude_none=True)
     if "url" in data:
         data["image_url"] = data.pop("url")
 
     async with app.state.pool.acquire() as conn:
-        result = await update_user(conn, users_id, **data)
+        result = await update_user(conn, user_id, **data)
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
