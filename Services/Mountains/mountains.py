@@ -125,9 +125,7 @@ DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@mountains-db:5432/mountains_servi
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    app.state.pool = await asyncpg.create_pool(
-        "postgresql://postgres:219448602@localhost:5433/mountains_service"
-    )
+    app.state.pool = await asyncpg.create_pool(DBurl)
 
     async with app.state.pool.acquire() as conn:
         await conn.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')
