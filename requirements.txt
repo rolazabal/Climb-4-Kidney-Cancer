@@ -1,2 +1,6 @@
+boto3
+uvicorn
+asyncpg
+httpx
 fastapi==0.128.0
 pydantic==2.12.5

@@ -1,16 +1,15 @@
 {
   "expo": {
-    "name": "App",
-    "slug": "App",
+    "name": "SummitSteps",
+    "slug": "SummitSteps",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "app",
+    "scheme": "summitsteps",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.App"
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
@@ -20,8 +19,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.app"
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
