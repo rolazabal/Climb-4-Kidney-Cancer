@@ -70,7 +70,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: mountains-service
+      POSTGRES_DB: mountains_service
     ports:
       - "5433:5432"
     volumes:
