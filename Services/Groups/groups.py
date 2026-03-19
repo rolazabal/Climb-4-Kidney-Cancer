@@ -1,7 +1,9 @@
 # IMPORTS
 # type "fastapi dev mountains.py" in console to run
+import os
 import asyncpg
 import uuid
+import enum
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
@@ -228,7 +230,10 @@ async def get_member_role(conn, group_id, user_id):
 # LIFESPAN: GROUPS
 # --------------
 
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/groups_service"
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@group-db:5432/groups_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -237,41 +242,55 @@ async def lifespan(app: FastAPI):
     async with app.state.pool.acquire() as conn:
         await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
 
-        # Create groups table
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS groups (
-                group_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                name varchar(255) UNIQUE NOT NULL,
-                created_by uuid NOT NULL,
-                created_at timestamp DEFAULT CURRENT_TIMESTAMP
-            );
-            """
-        )
+        # GROUPS TABLES
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS groups (
+            group_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            name varchar(255) UNIQUE NOT NULL,
+            created_by uuid NOT NULL,
+            created_at timestamp DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
 
-        # Create enum type for roles (Leader/Member only; removed High)
-        await conn.execute(
-            """
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'group_role') THEN
-                    CREATE TYPE group_role AS ENUM ('Leader', 'Member');
-                END IF;
-            END$$;
-            """
-        )
+        await conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'group_role') THEN
+                CREATE TYPE group_role AS ENUM ('Leader', 'Member');
+            END IF;
+        END$$;
+        """)
 
-        # Create group_members table
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS group_members (
-                group_id uuid REFERENCES groups(group_id) ON DELETE CASCADE,
-                user_id uuid NOT NULL,
-                role group_role NOT NULL DEFAULT 'Member',
-                PRIMARY KEY (group_id, user_id)
-            );
-            """
-        )
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS group_members (
+            group_id uuid REFERENCES groups(group_id) ON DELETE CASCADE,
+            user_id uuid NOT NULL,
+            role group_role NOT NULL DEFAULT 'Member',
+            PRIMARY KEY (group_id, user_id)
+        );
+        """)
+
+        # GROUP CLIMB TABLES
+        await conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'group_climb_status') THEN
+                CREATE TYPE group_climb_status AS ENUM ('active', 'inactive');
+            END IF;
+        END$$;
+        """)
+
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS group_climb (
+            group_climb_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            group_id uuid NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
+            climb_name varchar(255) NOT NULL,
+            mountain_id uuid NOT NULL,
+            total_height double precision NOT NULL DEFAULT 0,
+            status group_climb_status NOT NULL DEFAULT 'active',
+            UNIQUE (group_id, climb_name)
+        );
+        """)
 
     yield
     await app.state.pool.close()
@@ -326,48 +345,6 @@ async def remove_group(group_id: uuid.UUID):
     if result == "DELETE 0":
         raise HTTPException(404, "Group not found")
     return {"message": "Group deleted successfully"}
-
-# --------------
-# LIFESPAN: GROUP CLIMB
-# --------------
-
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/groups_service"
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    app.state.pool = await asyncpg.create_pool(DBurl)
-
-    async with app.state.pool.acquire() as conn:
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
-        await conn.execute(
-            """
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'group_climb_status') THEN
-                    CREATE TYPE group_climb_status AS ENUM ('active', 'inactive');
-                END IF;
-            END$$;
-            """
-        )
-
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS group_climb (
-                group_climb_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                group_id uuid NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
-                climb_name varchar(255) NOT NULL,
-                mountain_id uuid NOT NULL,
-                total_height double precision NOT NULL DEFAULT 0,
-                status group_climb_status NOT NULL DEFAULT 'active',
-                UNIQUE (group_id, climb_name)
-            );
-            """
-        )
-
-    yield
-    await app.state.pool.close()
-
-app = FastAPI(lifespan=lifespan)
 
 
 # ----------
