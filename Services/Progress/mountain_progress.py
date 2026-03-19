@@ -177,7 +177,7 @@ async def list_all_climbs(conn):
 # LIFESPAN
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/progress_service"
+DBurl = "postgresql://postgres:219448602@localhost:5433/progress_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -193,6 +193,10 @@ async def lifespan(app: FastAPI):
                     CREATE TYPE climb_status AS ENUM ('active', 'inactive', 'complete');
                 END IF;
             END$$;
+        """)
+
+        await conn.execute("""
+            DROP TABLE IF EXISTS climbs CASCADE;
         """)
 
         await conn.execute("""

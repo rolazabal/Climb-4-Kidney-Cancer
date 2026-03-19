@@ -86,14 +86,15 @@ async def list_mountains(conn):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://summit_admin:admin0415@localhost:5432/mountains_service"
+DBurl = "postgresql://postgres:219448602@localhost:5433/mountains_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(
-       DBurl
+        "postgresql://postgres:219448602@localhost:5433/mountains_service"
     )
+
     async with app.state.pool.acquire() as conn:
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS mountains(
@@ -103,7 +104,7 @@ async def lifespan(app: FastAPI):
                 location text NOT NULL,
                 description text,
                 image_url text
-        )
+        );
     """)
 
     yield
@@ -152,7 +153,7 @@ async def get_mountains():
 
 # delete mountain entry
 @app.delete("/mountains/{mountain_id}")
-async def delete_mountain(mountain_id: str):
+async def delete_mountain_route(mountain_id: str):
     async with app.state.pool.acquire() as conn:
         result = await delete_mountain(conn, mountain_id)
 
