@@ -86,7 +86,7 @@ services:
     volumes:
       - users_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d accounts_service"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -102,7 +102,7 @@ services:
     volumes:
       - mountains_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d mountains_service"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -118,7 +118,7 @@ services:
     volumes:
       - progress_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d progress_service"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -134,7 +134,7 @@ services:
     volumes:
       - group_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d groups_service"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -151,7 +151,7 @@ services:
     volumes:
       - events_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d events_service"]
       interval: 5s
       timeout: 5s
       retries: 5
