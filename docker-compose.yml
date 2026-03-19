@@ -12,6 +12,7 @@ services:
       - users-service
       - mountains-service
       - progress-service
+      - groups-service
       - events-service
 
   users-service:
@@ -56,6 +57,18 @@ services:
       progress-db:
         condition: service_healthy
 
+  groups-service:
+    build: .
+    command: uvicorn Services.Groups.groups:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8004:8000"
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      group-db:
+        condition: service_healthy
+
   events-service:
     build: .
     command: uvicorn Services.Events.events:app --host 0.0.0.0 --port 8000
@@ -65,7 +78,7 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
-      progress-db:
+      event-db:
         condition: service_healthy
 
   users-db:
@@ -116,6 +129,22 @@ services:
       timeout: 5s
       retries: 5
 
+  group-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: groups_service
+    ports:
+      - "5435:5432"
+    volumes:
+      - group_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 
   event-db:
     image: postgres:15
@@ -138,4 +167,5 @@ volumes:
   users_data:
   mountains_data:
   progress_data:
+  group_data:
   events_data:
