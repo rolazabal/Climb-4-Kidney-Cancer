@@ -144,7 +144,7 @@ function MountainsPage() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <Text style={styles.pageTitle}>Mountains</Text>
+        <Text style={styles.pageTitle}>Climb</Text>
         <Text style={styles.pageSubtitle}>Track climbs in progress and start new routes.</Text>
 
         <Pressable style={styles.startButton} onPress={() => setIsSelectingMountain((current) => !current)}>

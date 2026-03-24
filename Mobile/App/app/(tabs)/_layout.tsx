@@ -1,8 +1,9 @@
-import { Tabs } from 'expo-router';
+import { Stack, Tabs } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import 'react-native-reanimated';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +11,10 @@ import { Play, Pause, RotateCcw, Flag, Mountain as MountainIcon, Trophy } from '
 import { TrendingUp, Map, Settings, User, LucideIcon } from 'lucide-react-native'; //for navigation bar
 import { Text, TextProps } from 'react-native';
 
+
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
 
 const theme = {
   primary: 'rgb(51, 51, 51)',

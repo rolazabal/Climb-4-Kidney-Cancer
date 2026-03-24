@@ -3,11 +3,10 @@
 import asyncpg
 import asyncio
 import uuid
-import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
-from Services.config import PROGRESS_SERVICE_URL
+
 
 
 # SCHEMA
@@ -87,7 +86,7 @@ async def list_mountains(conn):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/mountains_service"
+DBurl = "postgresql://postgres:0410@localhost:5432/mountains_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -153,7 +152,7 @@ async def get_mountains():
 
 # delete mountain entry
 @app.delete("/mountains/{mountain_id}")
-async def delete_mountain(mountain_id: str):
+async def remove_mountain(mountain_id: str):
     async with app.state.pool.acquire() as conn:
         result = await delete_mountain(conn, mountain_id)
 
