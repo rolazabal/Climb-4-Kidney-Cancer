@@ -109,7 +109,7 @@ async def read_mountain(conn, mountain_id: str):
 
 async def list_mountains(conn):
     rows = await conn.fetch("""
-        SELECT uuid, name, height, location FROM mountains
+        SELECT uuid, name FROM mountains
     """)
     return [dict(row) for row in rows]
 

@@ -1,11 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Stack } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Stack, router, useLocalSearchParams } from "expo-router";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
 import { Colors } from "@/constants/theme";
-import { USERS_URL } from "@/constants/api";
 
 type StatItem = {
   id: string;
@@ -14,16 +11,11 @@ type StatItem = {
   value: number;
 };
 
-type UserProfile = {
-  username: string;
-  email: string;
-};
-
-const USER_ID = "dba1478d-d529-4a6b-92f0-a810b7ce9e97";
-
-const fallbackProfile: UserProfile = {
+const profile = {
   username: "Username",
   email: "GmailUsername@gmail.com",
+  currentStreak: 0,
+  longestStreak: 0,
 };
 
 const stats: StatItem[] = [
@@ -32,40 +24,18 @@ const stats: StatItem[] = [
   { id: "3", icon: "locate-outline", label: "Total Elevation (ft)", value: 0 },
   { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: 0 },
 ];
-
 const c = Colors.light;
 
 function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile>(fallbackProfile);
-
-  async function loadUserProfile() {
-    if (!USER_ID) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`${USERS_URL}/users/id/${USER_ID}`);
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch user profile: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      setProfile({
-        username: data.username ?? fallbackProfile.username,
-        email: data.email ?? fallbackProfile.email,
-      });
-    } catch (error) {
-      console.log("Failed to load user profile:", error);
-    }
-  }
-
-  useFocusEffect(
-    useCallback(() => {
-      loadUserProfile();
-    }, [])
-  );
+  const params = useLocalSearchParams<{ username?: string; email?: string }>();
+  const username =
+    typeof params.username === "string" && params.username.trim().length > 0
+      ? params.username.trim()
+      : profile.username;
+  const email =
+    typeof params.email === "string" && params.email.trim().length > 0
+      ? params.email.trim()
+      : profile.email;
 
   return (
     <>
@@ -80,21 +50,21 @@ function ProfilePage() {
             <View style={styles.avatar}>
               <Ionicons name="person-outline" size={36} color={c.onPrimary} />
             </View>
-            <Text style={styles.username}>{profile.username}</Text>
-            <Text style={styles.email}>{profile.email}</Text>
+            <Text style={styles.username}>{username}</Text>
+            <Text style={styles.email}>{email}</Text>
 
             <View style={styles.streakGrid}>
               <View style={[styles.streakCard, styles.streakCardWarm]}>
                 <Ionicons name="flame-outline" size={24} color={c.tint} />
                 <View>
-                  <Text style={styles.streakValue}>0</Text>
+                  <Text style={styles.streakValue}>{profile.currentStreak}</Text>
                   <Text style={styles.streakLabel}>Current Streak</Text>
                 </View>
               </View>
               <View style={[styles.streakCard, styles.streakCardCool]}>
                 <Ionicons name="calendar-outline" size={24} color={c.icon} />
                 <View>
-                  <Text style={styles.streakValue}>0</Text>
+                  <Text style={styles.streakValue}>{profile.longestStreak}</Text>
                   <Text style={styles.streakLabel}>Longest Streak</Text>
                 </View>
               </View>
@@ -125,6 +95,7 @@ function ProfilePage() {
             <Ionicons name="ellipse-outline" size={38} color={c.tabIconDefault} />
             <Text style={styles.achievementsText}>No achievements yet</Text>
           </View>
+
         </ScrollView>
       </SafeAreaView>
     </>
@@ -283,6 +254,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: c.tabIconDefault,
     fontWeight: "600",
+  },
+  editButton: {
+    marginTop: 14,
+    backgroundColor: c.tint,
+    borderRadius: 12,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  editButtonText: {
+    color: c.onPrimary,
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
 
