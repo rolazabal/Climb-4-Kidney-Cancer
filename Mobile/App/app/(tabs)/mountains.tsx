@@ -145,9 +145,9 @@ function Mountains() {
     );
 }
 
-function MountainList({arr}) {
+function MountainList({ arr }: { arr: Array<{name: string; location: string; peak: string}> | null }) {
 
-    const Item = ({mountain}) => (
+    const Item = ({mountain}: {mountain: {name: string; location: string; peak: string}}) => (
         <View style={styles.item}>
             <View style={{flex: 1, padding: 10, backgroundColor: theme.primary, borderTopStartRadius: 10, borderTopEndRadius: 10}}>
                 <Text style={{fontSize: 24, color: theme.white}}>{mountain.name}</Text>
