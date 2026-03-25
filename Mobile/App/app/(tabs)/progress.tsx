@@ -2,6 +2,7 @@ import {StyleSheet, Text, View, FlatList, TouchableOpacity} from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from 'react';
 import { TextAlignCenter } from 'lucide-react-native';
+import { MOUNTAINS_URL, PROGRESS_URL } from '@/constants/api';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
