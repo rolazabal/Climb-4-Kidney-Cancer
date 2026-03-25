@@ -7,7 +7,7 @@ import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
 
 const c = Colors.light;
 
-// 반드시 users-service에 실제로 존재하는 user uuid로 바꿔야 함
+// uuid in user service, used for all user-specific requests across services
 const USER_ID = "dba1478d-d529-4a6b-92f0-a810b7ce9e97";
 
 type Mountain = {
@@ -58,8 +58,9 @@ function Climbs() {
 
     const list = await res.json();
 
-    // mountains.py의 /mountains 는 현재 uuid, name만 반환하므로
-    // 상세 정보는 각 mountain별로 다시 조회
+    // Fetch details for each mountain to get elevation and range info. 
+    // This is inefficient but the mountains service doesn't currently provide a bulk endpoint with this info. 
+    // In a real app, we'd want to optimize this.
     const detailPromises = list.map((m: any) =>
       fetch(`${MOUNTAINS_URL}/mountains/${m.uuid}`).then(async (r) => {
         if (!r.ok) {
