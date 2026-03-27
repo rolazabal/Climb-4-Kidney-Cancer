@@ -39,11 +39,10 @@ function Climbs() {
   const [isSelectingMountain, setIsSelectingMountain] = useState(false);
   const [availableMountains, setAvailableMountains] = useState(initialAvailableMountains);
   const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
-  const [currentClimbingMountainId, setCurrentClimbingMountainId] = useState<string | null>(
-    initialInProgressMountains.find((mountain) => !mountain.isPaused)?.id ?? null
+  const activeClimbs = useMemo(
+    () => inProgressMountains.filter((mountain) => !mountain.isPaused),
+    [inProgressMountains]
   );
-  const currentClimbingMountain =
-    inProgressMountains.find((mountain) => mountain.id === currentClimbingMountainId) ?? null;
 
   const sortedInProgress = useMemo(
     () => [...inProgressMountains].sort((a, b) => b.progressFt / b.elevationFt - a.progressFt / a.elevationFt),
@@ -52,11 +51,7 @@ function Climbs() {
 
   const startClimb = (mountain: Mountain) => {
     setAvailableMountains((current) => current.filter((item) => item.id !== mountain.id));
-    setInProgressMountains((current) => [
-      ...current.map((item) => ({ ...item, isPaused: true })),
-      { ...mountain, progressFt: 0, isPaused: false },
-    ]);
-    setCurrentClimbingMountainId(mountain.id);
+    setInProgressMountains((current) => [...current, { ...mountain, progressFt: 0, isPaused: false }]);
     setIsSelectingMountain(false);
   };
 
@@ -66,22 +61,11 @@ function Climbs() {
       return;
     }
 
-    if (targetMountain.isPaused) {
-      setInProgressMountains((current) =>
-        current.map((mountain) =>
-          mountain.id === mountainId ? { ...mountain, isPaused: false } : { ...mountain, isPaused: true }
-        )
-      );
-      setCurrentClimbingMountainId(mountainId);
-      return;
-    }
-
     setInProgressMountains((current) =>
-      current.map((mountain) => (mountain.id === mountainId ? { ...mountain, isPaused: true } : mountain))
+      current.map((mountain) =>
+        mountain.id === mountainId ? { ...mountain, isPaused: !targetMountain.isPaused } : mountain
+      )
     );
-    if (currentClimbingMountainId === mountainId) {
-      setCurrentClimbingMountainId(null);
-    }
   };
 
   const quitClimb = (mountainId: string) => {
@@ -100,9 +84,6 @@ function Climbs() {
 
       return current.filter((mountain) => mountain.id !== mountainId);
     });
-    if (currentClimbingMountainId === mountainId) {
-      setCurrentClimbingMountainId(null);
-    }
   };
 
   const resetClimbProgress = (mountainId: string) => {
@@ -152,13 +133,11 @@ function Climbs() {
             {isSelectingMountain ? "Done Selecting" : "Start New Climb"}
           </Text>
         </Pressable>
-        {currentClimbingMountain ? (
-          <Text style={styles.singleActiveHint}>
-            Currently climbing: {currentClimbingMountain.name}. Starting or resuming another climb pauses all others.
-          </Text>
-        ) : (
-          <Text style={styles.singleActiveHint}>No active climb right now.</Text>
-        )}
+        <Text style={styles.singleActiveHint}>
+          {activeClimbs.length > 0
+            ? `${activeClimbs.length} active climb${activeClimbs.length === 1 ? "" : "s"} right now. You can keep multiple climbs active at the same time.`
+            : "No active climbs right now."}
+        </Text>
 
         {isSelectingMountain ? (
           <View style={styles.section}>
