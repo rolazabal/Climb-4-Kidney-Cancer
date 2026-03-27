@@ -58,6 +58,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <User color={theme.secondary} size={24} />,
         }}
         />
+        <Tabs.Screen
+        name="event"
+        options={{
+          title: 'Events',
+          tabBarIcon: ({ color }) => <User color={theme.secondary} size={24} />,
+        }}
+        />
       </Tabs>
   );
 }
