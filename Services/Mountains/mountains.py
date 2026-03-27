@@ -1,12 +1,24 @@
 # IMPORTS
+import boto3
+import os
+
+S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
+S3_REGION = os.getenv("S3_REGION", "us-east-2")
+
+s3 = boto3.client("s3", region_name=S3_REGION)
+
+MOUNTAIN_PREFIX = "MountainsImages/"
+
 # type "fastapi dev mountains.py" in console to run
+import os
 import asyncpg
 import asyncio
 import uuid
+import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
-
+from Services.config import PROGRESS_SERVICE_URL
 
 
 # SCHEMA
@@ -17,12 +29,32 @@ class Mountain(BaseModel):
     description: str | None = None
     url: str | None = None
 
+class MountainPatch(BaseModel):
+    name: str | None = None
+    height: float | None = None
+    location: str | None = None
+    description: str | None = None
+    url: str | None = None
+
 
 
 # --------------------
 # DB Functions (CRUD)
 # --------------------
 
+
+def presigned_get_url(key: str, expires_seconds: int = 3600) -> str:
+    return s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": S3_BUCKET, "Key": key},
+        ExpiresIn=expires_seconds,
+    )
+
+def to_mountain_key(filename_or_key: str) -> str:
+    # If DB already contains a full key, keep it
+    if filename_or_key.startswith(MOUNTAIN_PREFIX):
+        return filename_or_key
+    return MOUNTAIN_PREFIX + filename_or_key
 
 async def create_mountain(conn, name, height, location, description=None, image_url=None):
     row = await conn.fetchrow('''
@@ -77,7 +109,7 @@ async def read_mountain(conn, mountain_id: str):
 
 async def list_mountains(conn):
     rows = await conn.fetch("""
-        SELECT uuid, name FROM mountains
+        SELECT uuid, name, height, location FROM mountains
     """)
     return [dict(row) for row in rows]
 
@@ -85,8 +117,10 @@ async def list_mountains(conn):
 # --------------
 # LIFESPAN 
 # --------------
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-DBurl = "postgresql://postgres:admin@localhost:5432/mountains_service"
+DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@mountains-db:5432/mountains_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -95,6 +129,7 @@ async def lifespan(app: FastAPI):
        DBurl
     )
     async with app.state.pool.acquire() as conn:
+        await conn.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS mountains(
                 uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -163,9 +198,9 @@ async def remove_mountain(mountain_id: str):
 
 # update mountain entry
 @app.patch("/mountains/{mountain_id}")
-async def patch_mountain(mountain_id: str, patch: dict = Body(...)):
-    allowed = {"name", "height", "location", "description", "url"}
-    data = {k: v for k, v in patch.items() if k in allowed and v is not None}
+async def patch_mountain(mountain_id: str, patch: MountainPatch):
+    data = patch.model_dump(exclude_unset=True, exclude_none=True)
+
     if "url" in data:
         data["image_url"] = data.pop("url")
 
@@ -174,4 +209,19 @@ async def patch_mountain(mountain_id: str, patch: dict = Body(...)):
 
     if result.endswith("0"):
         raise HTTPException(404, "Mountain not found")
+
     return {"message": "Mountain updated"}
+
+@app.get("/mountains/{mountain_id}/image-url")
+async def get_mountain_image_url(mountain_id: str):
+    async with app.state.pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT image_url FROM mountains WHERE uuid=$1::uuid",
+            mountain_id
+        )
+    if not row or not row["image_url"]:
+        raise HTTPException(404, "Image not found")
+
+    # DB stores filename like "EverestPhoto.jpg"
+    key = to_mountain_key(row["image_url"])  # -> "MountainsImages/EverestPhoto.jpg"
+    return {"url": presigned_get_url(key)}

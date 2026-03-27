@@ -1,13 +1,17 @@
 # IMPORTS
 # type "fastapi dev mountains.py" in console to run
+import os
 import asyncpg
 import asyncio
 import uuid
+import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel
 from datetime import date
 from enum import Enum
+
+from Services.config import USERS_SERVICE_URL, MOUNTAINS_SERVICE_URL # For http/ports
 
 
 # SCHEMA (Users)
@@ -66,7 +70,7 @@ async def read_user_progress(conn, user_id):
         return dict(row)
     else:
         raise HTTPException(404, "User not found")
-    
+
 async def apply_progress_update(conn, user_id, delta_height=0.0, delta_points=0, delta_mountains=0):
     row = await conn.fetchrow(
         """
@@ -88,7 +92,7 @@ async def delete_user_progress(conn, user_id):
         "DELETE FROM user_progress WHERE user_id=$1",
         user_id
     )
-    return row 
+    return row
 
 # Climb DB Functions
 
@@ -174,17 +178,20 @@ async def list_all_climbs(conn):
     return [dict(row) for row in rows]
 
 # --------------
-# LIFESPAN 
+# LIFESPAN
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/progress_service"
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@progress-db:5432/progress_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(DBurl)
     async with app.state.pool.acquire() as conn:
-        
+
         # Create enum type if it doesn't exist
         await conn.execute("""
             DO $$
@@ -194,7 +201,7 @@ async def lifespan(app: FastAPI):
                 END IF;
             END$$;
         """)
-        
+
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS climbs(
                 climb_uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -206,7 +213,7 @@ async def lifespan(app: FastAPI):
                 status climb_status NOT NULL DEFAULT 'active'
             );
         """)
-        
+
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_progress(
                 user_id uuid PRIMARY KEY,
@@ -248,10 +255,10 @@ async def get_progress(user_id: uuid.UUID):
 async def update_progress(user_id: uuid.UUID, delta: ProgressDelta):
     async with app.state.pool.acquire() as conn:
         result = await apply_progress_update(
-            conn, 
-            user_id, 
-            delta_height=delta.delta_height, 
-            delta_points=delta.delta_points, 
+            conn,
+            user_id,
+            delta_height=delta.delta_height,
+            delta_points=delta.delta_points,
             delta_mountains=delta.delta_mountains
         )
     if not result:
@@ -270,6 +277,25 @@ async def delete_progress(user_id: uuid.UUID):
 
 @app.post("/progress")
 async def create_climb(climb: ClimbProgress):
+    
+    async with httpx.AsyncClient() as client:
+        
+        # Check if user exists
+        user_response = await client.get(
+            f"{USERS_SERVICE_URL}/users/id/{climb.user_id}"
+        )
+        if user_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Invalid User ID")
+        
+        # Check if mountain exists
+        mountain_response = await client.get(
+            f"{MOUNTAINS_SERVICE_URL}/mountains/{climb.mountain_id}"
+        )
+        if mountain_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Invalid Mountain ID")
+
+    
+    # Create Climb Progress after User/Mountain Verification
     async with app.state.pool.acquire() as conn:
         new_id = await create_climb_progress(
             conn,

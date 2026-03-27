@@ -1,5 +1,7 @@
 # IMPORTS
 # type "fastapi dev mountains.py" in console to run
+import os
+
 import asyncpg
 import asyncio
 import uuid
@@ -76,7 +78,10 @@ async def delete_user_progress(conn, user_id):
 # LIFESPAN 
 # --------------
 
-DBurl = "postgresql://postgres:admin@localhost:5432/progress_service"
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@progress-db:5432/progress_service"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

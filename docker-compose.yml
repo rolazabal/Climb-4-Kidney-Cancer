@@ -1,0 +1,171 @@
+version: "3.9"
+
+services:
+
+  # API Gateway Service (http://localhost:8000)
+  gateway-service: 
+    build: .
+    command: uvicorn Services.Gateway.gateway:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - users-service
+      - mountains-service
+      - progress-service
+      - groups-service
+      - events-service
+
+  users-service:
+    build: .
+    command: uvicorn Services.Accounts.users:app --host 0.0.0.0 --port 8000
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+    ports:
+      - "8001:8000"
+    depends_on:
+      users-db:
+        condition: service_healthy
+
+  mountains-service:
+    build: .
+    command: uvicorn Services.Mountains.mountains:app --host 0.0.0.0 --port 8000
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+    ports:
+      - "8002:8000"
+    depends_on:
+      mountains-db:
+        condition: service_healthy
+
+  progress-service:
+    build: .
+    command: uvicorn Services.Progress.mountain_progress:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8003:8000"
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      progress-db:
+        condition: service_healthy
+
+  groups-service:
+    build: .
+    command: uvicorn Services.Groups.groups:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8004:8000"
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      group-db:
+        condition: service_healthy
+
+  events-service:
+    build: .
+    command: uvicorn Services.Events.events:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8005:8000"
+    environment:
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      event-db:
+        condition: service_healthy
+
+  users-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: accounts_service
+    ports:
+      - "5432:5432"
+    volumes:
+      - users_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d accounts_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mountains-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: mountains_service
+    ports:
+      - "5433:5432"
+    volumes:
+      - mountains_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d mountains_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  progress-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: progress_service
+    ports:
+      - "5434:5432"
+    volumes:
+      - progress_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d progress_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  group-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: groups_service
+    ports:
+      - "5435:5432"
+    volumes:
+      - group_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d groups_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  event-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: events_service
+    ports:
+      - "5436:5432"
+    volumes:
+      - events_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d events_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+volumes:
+  users_data:
+  mountains_data:
+  progress_data:
+  group_data:
+  events_data:
