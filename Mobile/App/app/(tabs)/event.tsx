@@ -20,7 +20,7 @@ function Event() {
 	useEffect(() => {
 		const recordTime = async (startTime: number) => {
 			//console.log("record called");
-			let db = await SQLite.openDatabaseAsync("app", {useNewConnection: true});
+			let db = await getConn();
 			//console.log("got connection");
 			await db.execAsync(`
 				CREATE TABLE IF NOT EXISTS timer (startTime INTEGER);    
@@ -43,6 +43,7 @@ function Event() {
 			}, 10);
 		} else {
 			clearInterval(timer.current);
+			clearTimer();
 		}
 
 		return () => {
@@ -57,10 +58,9 @@ function Event() {
 	useEffect(() => {
 		const readTime = async () => {
 			//console.log("read called");
-			let db = await SQLite.openDatabaseAsync("app", {useNewConnection: true});
-			//console.log("connected");
+			let db = await getConn();
 			let row = await db.getFirstAsync('SELECT * from timer');
-			//console.log(row);
+			console.log(row);
 			if (row !== null && row.hasOwnProperty("startTime")) {
 				let newElapsed = Date.now() - row.startTime;
 				setElapsed(newElapsed);
@@ -90,7 +90,6 @@ function Event() {
 		} finally {
 			await statement.finalizeAsync();
 		}
-		setElapsed(0);
 	}
 
 	return(
@@ -99,13 +98,13 @@ function Event() {
 				<Text>
 					Milliseconds: {elapsed}
 				</Text>
-				<TouchableOpacity onPress={() => setActive(!active)}>
+				<TouchableOpacity onPress={() => {setActive(!active)}}>
 					<Text>
 						{active ? "Stop" : "Start"}
 					</Text>
 				</TouchableOpacity>
 				{!active &&
-				<TouchableOpacity onPress={() => clearTimer()}>
+				<TouchableOpacity onPress={() => {setElapsed(0); clearTimer();}}>
 					<Text>
 						Clear
 					</Text>
