@@ -14,6 +14,7 @@ services:
       - progress-service
       - groups-service
       - events-service
+      - auth-service
 
   users-service:
     build: .
@@ -80,6 +81,16 @@ services:
     depends_on:
       event-db:
         condition: service_healthy
+
+  auth-service:
+    build: .
+    command: uvicorn Services.Authentication.auth:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8006:8000"
+    environment:
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+    depends_on:
+      - users-service
 
   users-db:
     image: postgres:15

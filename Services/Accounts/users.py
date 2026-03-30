@@ -10,16 +10,32 @@ s3 = boto3.client("s3", region_name=S3_REGION)
 USER_PREFIX = "UserImages/"
 
 # type "fastapi dev users.py" in console to run
-from datetime import date
+
 import os
 import asyncpg
 import asyncio
 import uuid
 import httpx
+from datetime import date
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Depends, Body
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
 from pydantic import BaseModel
 from Services.config import PROGRESS_SERVICE_URL
+
+# Security
+security = HTTPBearer()
+
+SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
+ALGORITHM = "HS256"
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload["sub"]
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 # SCHEMA
@@ -273,3 +289,17 @@ async def get_user_image_url(user_id: str):
     # DB stores filename like "user123photo.jpg"
     key = to_user_key(row["profile_photo_media_id"])  # -> "UserImages/user123photo.jpg"
     return {"url": presigned_get_url(key)}
+
+
+@app.get("/users/by-email/{email}")
+async def get_user_by_email(email: str):
+    async with app.state.pool.acquire() as conn:
+        user = await conn.fetchrow(
+            "SELECT * FROM users WHERE email = $1",
+            email
+        )
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return dict(user)
