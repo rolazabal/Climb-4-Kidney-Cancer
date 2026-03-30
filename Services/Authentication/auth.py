@@ -43,14 +43,19 @@ def create_access_token(data: dict):
 
 
 def verify_token(token: str):
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 
 
 # -----------------
 # OTP STORAGE (TEMP)
 # -----------------
 
-otp_store = {}
+otp_store = {}  # Swap to Redis for Prod-level
 
 
 def generate_otp():
@@ -130,7 +135,7 @@ async def verify_login(payload: VerifyLogin):
         raise HTTPException(status_code=404, detail="User not found")
 
     token = create_access_token({
-        "sub": user["uuid"],   # IMPORTANT: use UUID, not email
+        "sub": user["uuid"],
         "email": user["email"]
     })
 
@@ -138,3 +143,9 @@ async def verify_login(payload: VerifyLogin):
         "access_token": token,
         "token_type": "bearer"
     }
+
+# Useful for debugging JWTs
+@app.post("/verify-token")
+async def verify_jwt(token: str):
+    payload = verify_token(token)
+    return {"sub": payload.get("sub"), "email": payload.get("email")}
