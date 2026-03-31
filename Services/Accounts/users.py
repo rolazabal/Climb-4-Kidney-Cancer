@@ -22,7 +22,6 @@ from fastapi import FastAPI, HTTPException, APIRouter, Depends, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
-from Services.config import PROGRESS_SERVICE_URL
 
 # Security
 security = HTTPBearer()
@@ -30,11 +29,12 @@ security = HTTPBearer()
 SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
 ALGORITHM = "HS256"
 
+
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         return payload["sub"]
-    except JWTError:
+    except JWTError as e:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
@@ -243,7 +243,7 @@ async def delete_user(user_id: uuid.UUID, current_user: str = Depends(get_curren
     return {"message": "User deleted"}
 
 # update user entry
-@router.patch("/{users_id}")
+@router.patch("/{user_id}")
 async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: str = Depends(get_current_user)):
     data = patch.model_dump(exclude_unset=True, exclude_none=True)
     if "url" in data:
@@ -305,17 +305,4 @@ async def get_user_by_email(email: str):
 
         return dict(user)
     
-# --------------------
-# DEBUG TOKEN ROUTE
-# --------------------
-@router.get("/debug-token")
-async def debug_token(current_user: str = Depends(get_current_user)):
-    """
-    Debug route to verify that the JWT token is decoded correctly.
-    Returns the full token payload.
-    """
-    # current_user is payload["sub"], let's decode the full payload manually for debug
-    return {"user_sub": current_user}
-    
-# Include router in app
 app.include_router(router, prefix="/users", tags=["users"])
