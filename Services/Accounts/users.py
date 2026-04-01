@@ -10,16 +10,32 @@ s3 = boto3.client("s3", region_name=S3_REGION)
 USER_PREFIX = "UserImages/"
 
 # type "fastapi dev users.py" in console to run
-from datetime import date
+
 import os
 import asyncpg
 import asyncio
 import uuid
 import httpx
+from datetime import date
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, APIRouter, Depends, Body
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
 from pydantic import BaseModel
-from Services.config import PROGRESS_SERVICE_URL
+
+# Security
+security = HTTPBearer()
+
+SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
+ALGORITHM = "HS256"
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload["sub"]
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 # SCHEMA
@@ -169,6 +185,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+router = APIRouter()
 
 
 
@@ -176,7 +193,7 @@ app = FastAPI(lifespan=lifespan)
 # ROUTES
 # ----------
 
-@app.post("/users")
+@router.post("/")
 async def add_user(users: User):
     async with app.state.pool.acquire() as conn:
         new_id = await create_user(
@@ -191,8 +208,8 @@ async def add_user(users: User):
     return {"id": new_id}
 
 # get user by id
-@app.get("/users/id/{user_id}")
-async def get_user(user_id: uuid.UUID):
+@router.get("/id/{user_id}")
+async def get_user(user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
 
     async with app.state.pool.acquire() as conn:
         result = await read_user(conn, user_id)
@@ -203,8 +220,8 @@ async def get_user(user_id: uuid.UUID):
     return dict(result)
 
 # get user by name
-@app.get("/users/username/{username}")
-async def get_user_by_name(username: str):
+@router.get("/username/{username}")
+async def get_user_by_name(username: str, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await read_user_by_name(conn, username)
 
@@ -215,8 +232,8 @@ async def get_user_by_name(username: str):
 
 
 # delete user entry
-@app.delete("/users/{user_id}")
-async def delete_user(user_id: uuid.UUID):
+@router.delete("/{user_id}")
+async def delete_user(user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_user_db(conn, user_id)
 
@@ -226,8 +243,8 @@ async def delete_user(user_id: uuid.UUID):
     return {"message": "User deleted"}
 
 # update user entry
-@app.patch("/users/{users_id}")
-async def patch_user(user_id: uuid.UUID, patch: UserPatch):
+@router.patch("/{user_id}")
+async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: str = Depends(get_current_user)):
     data = patch.model_dump(exclude_unset=True, exclude_none=True)
     if "url" in data:
         data["image_url"] = data.pop("url")
@@ -239,8 +256,8 @@ async def patch_user(user_id: uuid.UUID, patch: UserPatch):
         raise HTTPException(404, "User not found")
 
 # get all users
-@app.get("/users")
-async def get_users():
+@router.get("/")
+async def get_users(current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await list_users(conn)
 
@@ -250,8 +267,8 @@ async def get_users():
     return [dict(record) for record in result]  
 
 # toggle notification setting
-@app.put("/user_settings/{user_id}")
-async def toggle(user_id: uuid.UUID, notification_on: bool = Body(...)):
+@router.put("/user_settings/{user_id}")
+async def toggle(user_id: uuid.UUID, notification_on: bool = Body(...), current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await toggle_notification(conn, user_id, notification_on)
 
@@ -260,8 +277,8 @@ async def toggle(user_id: uuid.UUID, notification_on: bool = Body(...)):
 
     return {"message": "Notification setting updated"}
 
-@app.get("/users/{user_id}/profile_photo_media_id")
-async def get_user_image_url(user_id: str):
+@router.get("/{user_id}/profile_photo_media_id")
+async def get_user_image_url(user_id: str, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT profile_photo_media_id FROM users WHERE uuid=$1::uuid",
@@ -273,3 +290,19 @@ async def get_user_image_url(user_id: str):
     # DB stores filename like "user123photo.jpg"
     key = to_user_key(row["profile_photo_media_id"])  # -> "UserImages/user123photo.jpg"
     return {"url": presigned_get_url(key)}
+
+
+@router.get("/by-email/{email}")
+async def get_user_by_email(email: str):
+    async with app.state.pool.acquire() as conn:
+        user = await conn.fetchrow(
+            "SELECT * FROM users WHERE email = $1",
+            email
+        )
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return dict(user)
+    
+app.include_router(router, prefix="/users", tags=["users"])
