@@ -7,7 +7,7 @@ import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Play, Pause, RotateCcw, Flag, Mountain as MountainIcon, Trophy } from 'lucide-react-native';
+import { Play, Pause, RotateCcw, Flag, Mountain as MountainIcon, UserRoundSearch } from 'lucide-react-native';
 import { TrendingUp, Map, Settings, User, LucideIcon } from 'lucide-react-native'; //for navigation bar
 import { Text, TextProps } from 'react-native';
 
@@ -70,6 +70,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Settings color={theme.secondary} size={24} />,
         }}
         />
+      <Tabs.Screen
+        name="group"
+        options={{
+          title: 'Groups',
+          tabBarIcon: ({ color }) => <UserRoundSearch color={theme.secondary} size={24} />,
+        }}
+      />
       </Tabs>
   );
 }
