@@ -6,12 +6,27 @@ import asyncio
 import uuid
 import httpx
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Depends, Body
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
 from pydantic import BaseModel
 from datetime import date
 from enum import Enum
 
 from Services.config import USERS_SERVICE_URL, MOUNTAINS_SERVICE_URL # For http/ports
+
+# Security
+security = HTTPBearer()
+
+SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
+ALGORITHM = "HS256"
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload["sub"]
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 # SCHEMA (Users)
