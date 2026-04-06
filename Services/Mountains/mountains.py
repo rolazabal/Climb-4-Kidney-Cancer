@@ -20,7 +20,6 @@ from fastapi import FastAPI, HTTPException, Depends, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
-from Services.config import PROGRESS_SERVICE_URL
 
 # Security
 security = HTTPBearer()
@@ -124,7 +123,7 @@ async def read_mountain(conn, mountain_id: str):
 
 async def list_mountains(conn):
     rows = await conn.fetch("""
-        SELECT uuid, name, height, location FROM mountains
+        SELECT * FROM mountains
     """)
     return [dict(row) for row in rows]
 
