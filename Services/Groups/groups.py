@@ -475,3 +475,12 @@ async def rename_climb(group_climb_id: uuid.UUID, payload: RenameClimbRequest):
         "group_climb_id": result["group_climb_id"],
         "new_name": result["climb_name"],
     }
+
+@app.get("/health")
+async def health():
+    try:
+        async with app.state.pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")

@@ -239,3 +239,12 @@ async def get_mountain_image_url(mountain_id: str):
     # DB stores filename like "EverestPhoto.jpg"
     key = to_mountain_key(row["image_url"])  # -> "MountainsImages/EverestPhoto.jpg"
     return {"url": presigned_get_url(key)}
+
+@app.get("/health")
+async def health():
+    try:
+        async with app.state.pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")

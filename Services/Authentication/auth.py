@@ -118,9 +118,11 @@ app = FastAPI(lifespan=lifespan)
 # -----------------
 
 async def get_user_by_email(email: str):
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=5.0) as client:
         try:
             response = await client.get(f"{USERS_SERVICE_URL}/users/by-email/{email}")
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Users service timed out")
         except Exception:
             raise HTTPException(status_code=500, detail="Users service unreachable")
 
@@ -357,3 +359,12 @@ async def logout(payload: LogoutRequest):
 async def verify_jwt(token: str):
     payload = verify_token(token)
     return {"sub": payload.get("sub"), "email": payload.get("email")}
+
+@app.get("/health")
+async def health():
+    redis_client = app.state.redis
+    try:
+        await redis_client.ping()
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Redis unavailable")
