@@ -20,7 +20,6 @@ from fastapi import FastAPI, HTTPException, Depends, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
-from Services.config import PROGRESS_SERVICE_URL
 
 # Security
 security = HTTPBearer()
@@ -124,7 +123,7 @@ async def read_mountain(conn, mountain_id: str):
 
 async def list_mountains(conn):
     rows = await conn.fetch("""
-        SELECT uuid, name, height, location FROM mountains
+        SELECT * FROM mountains
     """)
     return [dict(row) for row in rows]
 
@@ -240,3 +239,12 @@ async def get_mountain_image_url(mountain_id: str):
     # DB stores filename like "EverestPhoto.jpg"
     key = to_mountain_key(row["image_url"])  # -> "MountainsImages/EverestPhoto.jpg"
     return {"url": presigned_get_url(key)}
+
+@app.get("/health")
+async def health():
+    try:
+        async with app.state.pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")

@@ -306,3 +306,13 @@ async def get_user_by_email(email: str):
         return dict(user)
     
 app.include_router(router, prefix="/users", tags=["users"])
+
+
+@app.get("/health")
+async def health():
+    try:
+        async with app.state.pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
