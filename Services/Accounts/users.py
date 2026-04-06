@@ -13,15 +13,15 @@ USER_PREFIX = "UserImages/"
 
 import os
 import asyncpg
-import asyncio
 import uuid
 import httpx
 from datetime import date
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, APIRouter, Depends, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, EmailStr, field_validator
 from jose import jwt, JWTError
-from pydantic import BaseModel
+
 
 # Security
 security = HTTPBearer()
@@ -40,11 +40,32 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 
 # SCHEMA
 class User(BaseModel):
-    email: str
+    email: EmailStr
     username: str
     dob: date | None = None
     bio: str | None = None
     profile_photo_media_id: str | None = None
+    
+    @field_validator("username")
+    @classmethod
+    def username_valid(cls, v):
+        if len(v) < 3:
+            raise ValueError("Username must be at least 3 characters")
+        if len(v) > 30:
+            raise ValueError("Username must be at most 30 characters")
+        if not v.replace("_", "").isalnum():
+            raise ValueError("Username can only contain letters, numbers, and underscores")
+        return v
+    
+    
+    @field_validator("bio")
+    @classmethod
+    def bio_valid(cls, v):
+        if v and len(v) > 300:
+            raise ValueError("Bio must be at most 300 characters")
+        return v
+
+            
 
 class UserPatch(BaseModel):
     email: str | None = None

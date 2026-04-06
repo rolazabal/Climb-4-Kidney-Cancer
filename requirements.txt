@@ -4,5 +4,5 @@ asyncpg
 httpx
 boto3
 python-jose[cryptography]
-passlib[bcrypt]
+pydantic[email]
 redis

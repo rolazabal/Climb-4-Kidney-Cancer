@@ -9,7 +9,7 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 # -----------------
 # ENV + CONFIG
@@ -27,7 +27,7 @@ USERS_SERVICE_URL = "http://users-service:8000"
 # -----------------
 
 class RequestLogin(BaseModel):
-    email: str
+    email: EmailStr
     
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -36,7 +36,7 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 class VerifyLogin(BaseModel):
-    email: str
+    email: EmailStr
     code: str
 
 
