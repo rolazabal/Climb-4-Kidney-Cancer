@@ -297,19 +297,31 @@ async def delete_progress(user_id: uuid.UUID):
 @app.post("/progress")
 async def create_climb(climb: ClimbProgress):
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=5.0) as client:
         
-        # Check if user exists
-        user_response = await client.get(
-            f"{USERS_SERVICE_URL}/users/id/{climb.user_id}"
-        )
+        try:
+            user_response = await client.get(
+                f"{USERS_SERVICE_URL}/users/id/{climb.user_id}"
+            )
+            
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Users service timed out")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Users service unreachable")
+        
         if user_response.status_code != 200:
             raise HTTPException(status_code=400, detail="Invalid User ID")
         
-        # Check if mountain exists
-        mountain_response = await client.get(
-            f"{MOUNTAINS_SERVICE_URL}/mountains/{climb.mountain_id}"
-        )
+        try:
+            # Check if mountain exists
+            mountain_response = await client.get(
+                f"{MOUNTAINS_SERVICE_URL}/mountains/{climb.mountain_id}"
+            )
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Mountains service timed out")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Mountains service unreachable")
+        
         if mountain_response.status_code != 200:
             raise HTTPException(status_code=400, detail="Invalid Mountain ID")
 
@@ -412,3 +424,12 @@ async def patch_climb(climb_id: uuid.UUID, patch: ClimbProgressUpdate):
         raise HTTPException(404, "Climb not found")
 
     return {"message": "Climb updated"}
+
+@app.get("/health")
+async def health():
+    try:
+        async with app.state.pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")

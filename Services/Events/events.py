@@ -371,3 +371,12 @@ async def get_results_by_user_route(user_id: str):
     if not result:
         raise HTTPException(404, "No results found for this user")
     return result
+
+@app.get("/health")
+async def health():
+    try:
+        async with app.state.pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
