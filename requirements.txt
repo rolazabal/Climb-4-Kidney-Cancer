@@ -6,3 +6,5 @@ boto3
 python-jose[cryptography]
 passlib[bcrypt]
 redis
+email-validator
+python-dotenv

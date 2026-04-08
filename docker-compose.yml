@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
 
   # API Gateway Service (http://localhost:8000)
