@@ -245,10 +245,7 @@ async def get_member_role(conn, group_id, user_id):
 # LIFESPAN: GROUPS
 # --------------
 
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-
-DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@group-db:5432/groups_service"
+DBurl = os.getenv("DATABASE_URL")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

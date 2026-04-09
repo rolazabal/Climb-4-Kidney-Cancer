@@ -183,10 +183,7 @@ async def get_results_by_user(conn, user_id: uuid.UUID):
 # LIFESPAN
 # --------------
 
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-
-DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@event-db:5432/events_service"
+DBurl = os.getenv("DATABASE_URL")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
