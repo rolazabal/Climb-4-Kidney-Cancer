@@ -194,7 +194,9 @@ async def request_login(payload: RequestLogin):
     # TODO: replace with real email sending
     print(f"OTP for {payload.email}: {code}")
 
-    return {"message": "OTP sent"}
+    return {
+        "message": "OTP sent"
+        }
 
 
 @app.post("/verify-login")
