@@ -36,9 +36,14 @@ ALGORITHM = "HS256"
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload["sub"]
-    except JWTError as e:
+        return payload 
+    except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    
+def require_admin(current_user = Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return current_user
 
 
 # SCHEMA
@@ -48,6 +53,7 @@ class User(BaseModel):
     dob: date | None = None
     bio: str | None = None
     profile_photo_media_id: str | None = None
+    role: str = "user"
 
 class UserPatch(BaseModel):
     email: str | None = None
@@ -85,12 +91,12 @@ def to_user_key(filename_or_key: str) -> str:
         return filename_or_key
     return USER_PREFIX + filename_or_key
 
-async def create_user(conn, email, username, dob, bio = None, profile_photo_media_id = None):
+async def create_user(conn, email, username, dob, bio=None, profile_photo_media_id=None, role="user"):
     row = await conn.fetchrow('''
-        INSERT INTO users(email, username, dob, bio, profile_photo_media_id) 
-        VALUES($1, $2, $3, $4, $5) 
+        INSERT INTO users(email, username, dob, bio, profile_photo_media_id, role) 
+        VALUES($1, $2, $3, $4, $5, $6) 
         RETURNING uuid
-    ''', email, username, dob, bio, profile_photo_media_id)
+    ''', email, username, dob, bio, profile_photo_media_id, role)
     
     user_id = row["uuid"]
 
@@ -178,7 +184,8 @@ async def lifespan(app: FastAPI):
                 dob DATE,
                 bio TEXT,
                 profile_photo_media_id varchar(255),
-                email_verified BOOLEAN NOT NULL DEFAULT FALSE
+                email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+                role TEXT NOT NULL DEFAULT 'user'
             )
         """)
 
@@ -264,7 +271,8 @@ async def add_user(users: User):
             users.username,
             users.dob,
             users.bio,
-            users.profile_photo_media_id
+            users.profile_photo_media_id,
+            users.role
         )
         
     return {"id": new_id}
@@ -295,7 +303,7 @@ async def get_user_by_name(username: str, current_user: str = Depends(get_curren
 
 # delete user entry
 @router.delete("/{user_id}")
-async def delete_user(user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
+async def delete_user(user_id: uuid.UUID, current_user: dict = Depends(require_admin)):
     async with app.state.pool.acquire() as conn:
         result = await delete_user_db(conn, user_id)
 
@@ -319,7 +327,7 @@ async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: str = D
 
 # get all users
 @router.get("/")
-async def get_users(current_user: str = Depends(get_current_user)):
+async def get_users(current_user: dict = Depends(require_admin)):
     async with app.state.pool.acquire() as conn:
         result = await list_users(conn)
 
