@@ -318,7 +318,7 @@ app = FastAPI(lifespan=lifespan)
 # ----------
 
 @app.post("/groups/")
-async def make_group(group: Group):
+async def make_group(group: Group, current_user: str = Depends(get_current_user)):
     """
     Requirement:
     - Creator is automatically added to group_members with role = 'Leader'
@@ -346,7 +346,7 @@ async def read_groups():
     return groups
 
 @app.put("/groups/{group_id}")
-async def update_group_info(group_id: uuid.UUID, name: str = Body(None)):
+async def update_group_info(group_id: uuid.UUID, name: str = Body(None), current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await update_group(conn, group_id, name)
     if result == "UPDATE 0":
@@ -354,7 +354,7 @@ async def update_group_info(group_id: uuid.UUID, name: str = Body(None)):
     return {"message": "Group updated successfully"}
 
 @app.delete("/groups/{group_id}")
-async def remove_group(group_id: uuid.UUID):
+async def remove_group(group_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_group(conn, group_id)
     if result == "DELETE 0":
@@ -367,7 +367,7 @@ async def remove_group(group_id: uuid.UUID):
 # ----------
 
 @app.post("/groups/{group_id}/members/")
-async def add_group_member(group_id: uuid.UUID,user_id: uuid.UUID,):
+async def add_group_member(group_id: uuid.UUID,user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     """
     Requirement:
     - Any user added to an existing group is role = 'Member' by default
@@ -388,6 +388,7 @@ async def update_group_member_role(
     group_id: uuid.UUID,
     user_id: uuid.UUID,
     new_role: str = Body(..., embed=True),
+    current_user: str = Depends(get_current_user)
 ):
     # Only allow the two roles we support now
     if new_role not in ("Leader", "Member"):
@@ -402,7 +403,7 @@ async def update_group_member_role(
     return {"message": "Member role updated successfully"}
 
 @app.delete("/groups/{group_id}/members/{user_id}")
-async def delete_group_member(group_id: uuid.UUID, user_id: uuid.UUID):
+async def delete_group_member(group_id: uuid.UUID, user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await remove_member(conn, group_id, user_id)
 
@@ -416,7 +417,7 @@ async def delete_group_member(group_id: uuid.UUID, user_id: uuid.UUID):
 # --------------------
 
 @app.post("/group-climb/")
-async def create_climb(group_id: uuid.UUID, mountain_id: uuid.UUID, climb_name: str = Body(..., embed=True)):
+async def create_climb(group_id: uuid.UUID, mountain_id: uuid.UUID, climb_name: str = Body(..., embed=True), current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         try:
             new_climb = await create_group_climb(conn, group_id, climb_name, mountain_id)
@@ -439,7 +440,7 @@ async def list_climbs(group_id: uuid.UUID):
     return climbs
 
 @app.post("/group-climb/update/{group_climb_id}")
-async def update_climb(group_climb_id: uuid.UUID, delta: GroupClimbProgressUpdate):
+async def update_climb(group_climb_id: uuid.UUID, delta: GroupClimbProgressUpdate, current_user: str = Depends(get_current_user)):
     heightdelta = delta.heightdelta if delta.heightdelta is not None else 0.0
     status = delta.status.value if delta.status is not None else None
 
@@ -452,7 +453,7 @@ async def update_climb(group_climb_id: uuid.UUID, delta: GroupClimbProgressUpdat
     return result
 
 @app.delete("/group-climb/{group_climb_id}")
-async def delete_climb(group_climb_id: uuid.UUID):
+async def delete_climb(group_climb_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_group_climb(conn, group_climb_id)
     if result == "DELETE 0":
@@ -460,7 +461,7 @@ async def delete_climb(group_climb_id: uuid.UUID):
     return {"message": "Group Climb deleted successfully"}
 
 @app.post("/group-climb/{group_climb_id}/rename")
-async def rename_climb(group_climb_id: uuid.UUID, payload: RenameClimbRequest):
+async def rename_climb(group_climb_id: uuid.UUID, payload: RenameClimbRequest, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         try:
             result = await change_climb_name(conn, group_climb_id, payload.new_name)

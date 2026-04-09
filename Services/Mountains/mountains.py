@@ -144,9 +144,8 @@ DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@mountains-db:5432/mountains_servi
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    app.state.pool = await asyncpg.create_pool(
-       DBurl
-    )
+    app.state.pool = await asyncpg.create_pool(DBurl)
+
     async with app.state.pool.acquire() as conn:
         await conn.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')
         await conn.execute("""
@@ -157,7 +156,7 @@ async def lifespan(app: FastAPI):
                 location text NOT NULL,
                 description text,
                 image_url text
-        )
+        );
     """)
 
     yield
@@ -173,7 +172,7 @@ app = FastAPI(lifespan=lifespan)
 # ROUTES
 # ----------
 @app.post("/mountains")
-async def add_mountain(mountain: Mountain):
+async def add_mountain(mountain: Mountain, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         new_id = await create_mountain(
             conn,
@@ -209,7 +208,7 @@ async def get_mountains():
 
 # delete mountain entry
 @app.delete("/mountains/{mountain_id}")
-async def remove_mountain(mountain_id: str):
+async def remove_mountain(mountain_id: str, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_mountain(conn, mountain_id)
 
@@ -220,7 +219,7 @@ async def remove_mountain(mountain_id: str):
 
 # update mountain entry
 @app.patch("/mountains/{mountain_id}")
-async def patch_mountain(mountain_id: str, patch: MountainPatch):
+async def patch_mountain(mountain_id: str, patch: MountainPatch, current_user: str = Depends(get_current_user)):
     data = patch.model_dump(exclude_unset=True, exclude_none=True)
 
     if "url" in data:

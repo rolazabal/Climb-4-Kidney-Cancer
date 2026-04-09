@@ -218,6 +218,10 @@ async def lifespan(app: FastAPI):
         """)
 
         await conn.execute("""
+            DROP TABLE IF EXISTS climbs CASCADE;
+        """)
+
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS climbs(
                 climb_uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id uuid NOT NULL,
@@ -267,7 +271,7 @@ async def get_progress(user_id: uuid.UUID):
     return dict(result)
 
 @app.post("/user-progress/update/{user_id}")
-async def update_progress(user_id: uuid.UUID, delta: ProgressDelta):
+async def update_progress(user_id: uuid.UUID, delta: ProgressDelta, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await apply_progress_update(
             conn,
@@ -291,7 +295,7 @@ async def delete_progress(user_id: uuid.UUID):
 
 
 @app.post("/progress")
-async def create_climb(climb: ClimbProgress):
+async def create_climb(climb: ClimbProgress, current_user: str = Depends(get_current_user)):
     
     async with httpx.AsyncClient(timeout=5.0) as client:
         
@@ -376,7 +380,7 @@ async def get_active_climbs_by_user(user_id: uuid.UUID):
 
 # delete climb entry
 @app.delete("/progress/id/{climb_id}")
-async def delete_climb_by_id(climb_id: uuid.UUID):
+async def delete_climb_by_id(climb_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_climb(conn, climb_id)
 
@@ -387,7 +391,7 @@ async def delete_climb_by_id(climb_id: uuid.UUID):
 
 # delete all of a user's climb entries
 @app.delete("/progress/user/{user_id}")
-async def delete_user(user_id: uuid.UUID):
+async def delete_user(user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_climbs_by_user(conn, user_id)
 
@@ -409,7 +413,7 @@ async def delete_mountain(mountain_id: uuid.UUID):
 
 # update climb entry
 @app.patch("/progress/update/{climb_id}")
-async def patch_climb(climb_id: uuid.UUID, patch: ClimbProgressUpdate):
+async def patch_climb(climb_id: uuid.UUID, patch: ClimbProgressUpdate, current_user: str = Depends(get_current_user)):
 
     data = patch.dict(exclude_unset=True)
 
