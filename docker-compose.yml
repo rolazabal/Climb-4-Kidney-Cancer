@@ -1,9 +1,7 @@
-version: "3.9"
-
 services:
 
   # API Gateway Service (http://localhost:8000)
-  gateway-service: 
+  gateway-service:
     build: .
     command: uvicorn Services.Gateway.gateway:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
@@ -131,7 +129,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: accounts_service
     ports:
-      - "5432:5432"
+      - "5542:5432"
     volumes:
       - users_data:/var/lib/postgresql/data
     healthcheck:
@@ -148,7 +146,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: mountains_service
     ports:
-      - "5433:5432"
+      - "5543:5432"
     volumes:
       - mountains_data:/var/lib/postgresql/data
     healthcheck:
@@ -165,7 +163,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: progress_service
     ports:
-      - "5434:5432"
+      - "5544:5432"
     volumes:
       - progress_data:/var/lib/postgresql/data
     healthcheck:

@@ -1,26 +1,29 @@
 ## IMPORTS
+import random as rnd
+
 import boto3
-import os
-
-S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
-S3_REGION = os.getenv("S3_REGION", "us-east-2")
-
-s3 = boto3.client("s3", region_name=S3_REGION)
-
-USER_PREFIX = "UserImages/"
-
-# type "fastapi dev users.py" in console to run
-
 import os
 import asyncpg
 import uuid
 import httpx
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, APIRouter, Depends, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, field_validator
 from jose import jwt, JWTError
+from pydantic import BaseModel,EmailStr
+import hashlib
+
+S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
+S3_REGION = os.getenv("S3_REGION", "us-east-2")
+AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
+SES_FROM_EMAIL = os.getenv("SES_FROM_EMAIL", "chan202220@gmail.com")
+
+s3 = boto3.client("s3", region_name=S3_REGION)
+ses = boto3.client("sesv2", region_name=AWS_REGION)
+
+USER_PREFIX = "UserImages/"
 
 
 # Security
@@ -33,9 +36,14 @@ ALGORITHM = "HS256"
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload["sub"]
-    except JWTError as e:
+        return payload 
+    except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    
+def require_admin(current_user = Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return current_user
 
 
 # SCHEMA
@@ -45,6 +53,7 @@ class User(BaseModel):
     dob: date | None = None
     bio: str | None = None
     profile_photo_media_id: str | None = None
+    role: str = "user"
     
     @field_validator("username")
     @classmethod
@@ -65,8 +74,6 @@ class User(BaseModel):
             raise ValueError("Bio must be at most 300 characters")
         return v
 
-            
-
 class UserPatch(BaseModel):
     email: str | None = None
     username: str | None = None
@@ -77,6 +84,13 @@ class UserPatch(BaseModel):
 class UserSettings(BaseModel):
     user_id: uuid.UUID
     notification_on: bool
+
+class EmailRequest(BaseModel):
+    email: EmailStr
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str
 
 
 # --------------------
@@ -96,12 +110,12 @@ def to_user_key(filename_or_key: str) -> str:
         return filename_or_key
     return USER_PREFIX + filename_or_key
 
-async def create_user(conn, email, username, dob, bio = None, profile_photo_media_id = None):
+async def create_user(conn, email, username, dob, bio=None, profile_photo_media_id=None, role="user"):
     row = await conn.fetchrow('''
-        INSERT INTO users(email, username, dob, bio, profile_photo_media_id) 
-        VALUES($1, $2, $3, $4, $5) 
+        INSERT INTO users(email, username, dob, bio, profile_photo_media_id, role) 
+        VALUES($1, $2, $3, $4, $5, $6) 
         RETURNING uuid
-    ''', email, username, dob, bio, profile_photo_media_id)
+    ''', email, username, dob, bio, profile_photo_media_id, role)
     
     user_id = row["uuid"]
 
@@ -177,10 +191,10 @@ async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(DBurl)
     async with app.state.pool.acquire() as conn:
-        
+
         # enable UUID generation
         await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
-        
+
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
                 uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -188,7 +202,9 @@ async def lifespan(app: FastAPI):
                 username varchar NOT NULL UNIQUE,
                 dob DATE,
                 bio TEXT,
-                profile_photo_media_id varchar(255)
+                profile_photo_media_id varchar(255),
+                email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+                role TEXT NOT NULL DEFAULT 'user'
             )
         """)
 
@@ -198,15 +214,66 @@ async def lifespan(app: FastAPI):
                     notification_on boolean NOT NULL DEFAULT true
                 )
         """)
+
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS email_verifications (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            email VARCHAR(255) NOT NULL,
+            code_hash TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used BOOLEAN NOT NULL DEFAULT FALSE,
+            attempts INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        """)
     
     yield
 
     # shutdown
     await app.state.pool.close()
 
+def generate_verification_code() -> str:
+    return f"{rnd.randint(0, 999999):06d}"
+
+def hash_verification_code(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+def send_verification_email(to_email: str, code: str) -> None:
+    ses.send_email(
+        FromEmailAddress=SES_FROM_EMAIL,
+        Destination={"ToAddresses": [to_email]},
+        Content={
+            "Simple": {
+                "Subject": {
+                    "Data": "Your verification code",
+                    "Charset": "UTF-8"
+                },
+                "Body": {
+                    "Text": {
+                        "Data": f"Your verification code is {code}. It expires in 10 minutes.",
+                        "Charset": "UTF-8"
+                    },
+                    "Html": {
+                        "Data": f"""
+                        <html>
+                          <body>
+                            <h2>Email Verification</h2>
+                            <p>Your verification code is:</p>
+                            <p style="font-size:24px;font-weight:bold;">{code}</p>
+                            <p>This code expires in 10 minutes.</p>
+                          </body>
+                        </html>
+                        """,
+                        "Charset": "UTF-8"
+                    }
+                }
+            }
+        }
+    )
 
 app = FastAPI(lifespan=lifespan)
 router = APIRouter()
+
 
 
 
@@ -223,9 +290,10 @@ async def add_user(users: User):
             users.username,
             users.dob,
             users.bio,
-            users.profile_photo_media_id
+            users.profile_photo_media_id,
+            users.role
         )
-        
+
     return {"id": new_id}
 
 # get user by id
@@ -254,7 +322,7 @@ async def get_user_by_name(username: str, current_user: str = Depends(get_curren
 
 # delete user entry
 @router.delete("/{user_id}")
-async def delete_user(user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
+async def delete_user(user_id: uuid.UUID, current_user: dict = Depends(require_admin)):
     async with app.state.pool.acquire() as conn:
         result = await delete_user_db(conn, user_id)
 
@@ -278,7 +346,7 @@ async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: str = D
 
 # get all users
 @router.get("/")
-async def get_users(current_user: str = Depends(get_current_user)):
+async def get_users(current_user: dict = Depends(require_admin)):
     async with app.state.pool.acquire() as conn:
         result = await list_users(conn)
 
@@ -307,7 +375,7 @@ async def get_user_image_url(user_id: str, current_user: str = Depends(get_curre
         )
     if not row or not row["profile_photo_media_id"]:
         raise HTTPException(404, "Image not found")
-    
+
     # DB stores filename like "user123photo.jpg"
     key = to_user_key(row["profile_photo_media_id"])  # -> "UserImages/user123photo.jpg"
     return {"url": presigned_get_url(key)}
@@ -325,7 +393,7 @@ async def get_user_by_email(email: str):
             raise HTTPException(status_code=404, detail="User not found")
 
         return dict(user)
-    
+
 app.include_router(router, prefix="/users", tags=["users"])
 
 
@@ -337,3 +405,85 @@ async def health():
         return {"status": "ok"}
     except Exception:
         raise HTTPException(status_code=503, detail="Database unavailable")
+    
+@app.post("/auth/request-verification")
+async def request_verification(req: EmailRequest):
+    code = generate_verification_code()
+    code_hash = hash_verification_code(code)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    async with app.state.pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO email_verifications (email, code_hash, expires_at, used, attempts)
+            VALUES ($1, $2, $3, FALSE, 0)
+            """,
+            req.email,
+            code_hash,
+            expires_at
+        )
+
+    try:
+        send_verification_email(req.email, code)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+    return {"message": "Verification email sent"}
+
+
+@app.post("/auth/verify-email")
+async def verify_email(req: VerifyEmailRequest):
+    async with app.state.pool.acquire() as conn:
+        record = await conn.fetchrow(
+            """
+            SELECT id, code_hash, expires_at, used, attempts
+            FROM email_verifications
+            WHERE email = $1
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            req.email
+        )
+
+        if not record:
+            raise HTTPException(status_code=400, detail="No verification request found")
+
+        if record["used"]:
+            raise HTTPException(status_code=400, detail="Code already used")
+
+        if datetime.now(timezone.utc) > record["expires_at"]:
+            raise HTTPException(status_code=400, detail="Code expired")
+
+        if record["attempts"] >= 5:
+            raise HTTPException(status_code=400, detail="Too many attempts")
+
+        if hash_verification_code(req.code) != record["code_hash"]:
+            await conn.execute(
+                """
+                UPDATE email_verifications
+                SET attempts = attempts + 1
+                WHERE id = $1
+                """,
+                record["id"]
+            )
+            raise HTTPException(status_code=400, detail="Invalid code")
+
+        await conn.execute(
+            """
+            UPDATE email_verifications
+            SET used = TRUE
+            WHERE id = $1
+            """,
+            record["id"]
+        )
+
+        await conn.execute(
+            """
+            UPDATE users
+            SET email_verified = TRUE
+            WHERE email = $1
+            """,
+            req.email
+        )
+
+    return {"message": "Email verified successfully"}

@@ -5,4 +5,7 @@ httpx
 boto3
 python-jose[cryptography]
 pydantic[email]
+passlib[bcrypt]
 redis
+email-validator
+python-dotenv
