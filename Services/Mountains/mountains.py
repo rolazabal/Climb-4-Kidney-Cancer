@@ -21,6 +21,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
 
+
 # Security
 security = HTTPBearer()
 
@@ -74,8 +75,12 @@ async def create_mountain(conn, name, height, location, description=None, image_
     row = await conn.fetchrow('''
         INSERT INTO mountains(name, height, location, description, image_url)
         VALUES($1, $2, $3, $4, $5)
+        ON CONFLICT (name) DO NOTHING
         RETURNING uuid
     ''', name, height, location, description, image_url)
+
+    if row is None:
+        return None
 
     return str(row["uuid"])
 
@@ -146,7 +151,7 @@ async def lifespan(app: FastAPI):
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS mountains(
                 uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                name text NOT NULL,
+                name text NOT NULL UNIQUE,
                 height real NOT NULL,
                 location text NOT NULL,
                 description text,
@@ -176,8 +181,11 @@ async def add_mountain(mountain: Mountain, current_user: str = Depends(get_curre
             mountain.location,
             mountain.description,
             mountain.url
-            )
-        
+        )
+
+    if new_id is None:
+        return {"message": "Mountain already exists"}
+
     return {"id": new_id}
 
 # get mountain by id

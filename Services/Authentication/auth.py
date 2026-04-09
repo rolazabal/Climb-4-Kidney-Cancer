@@ -9,7 +9,7 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 # -----------------
 # ENV + CONFIG
@@ -27,7 +27,7 @@ USERS_SERVICE_URL = "http://users-service:8000"
 # -----------------
 
 class RequestLogin(BaseModel):
-    email: str
+    email: EmailStr
     
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -36,7 +36,7 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 class VerifyLogin(BaseModel):
-    email: str
+    email: EmailStr
     code: str
 
 
@@ -241,7 +241,8 @@ async def verify_login(payload: VerifyLogin):
 
     access_token = create_access_token({
         "sub": user["uuid"],
-        "email": user["email"]
+        "email": user["email"],
+        "role": user["role"]
     })
     
     refresh = create_refresh_token()
@@ -253,7 +254,8 @@ async def verify_login(payload: VerifyLogin):
         json.dumps({
             "user_id": user["uuid"],
             "sid": refresh["sid"],
-            "email": user["email"]
+            "email": user["email"],
+            "role": user["role"]
         }),
         ex = 60 * 60 * 24 * REFRESH_TOKEN_EXPIRE_DAYS
     )
@@ -301,6 +303,7 @@ async def refresh_token(payload: RefreshRequest):
         raise HTTPException(status_code=401, detail="Invalid session")
     
     email = stored_data.get("email")
+    role = stored_data.get("role", "user")
     
     # Rotate out old refresh token
     await redis_client.delete(refresh_key)
@@ -324,7 +327,8 @@ async def refresh_token(payload: RefreshRequest):
     # issue new access token
     new_access_token = create_access_token({
         "sub": user_id,
-        "email": email
+        "email": email,
+        "role": role
     })
     
     new_refresh_token = encode_refresh_token(
