@@ -246,7 +246,7 @@ app = FastAPI(lifespan=lifespan)
 # ----------
 
 @app.post("/event/")
-async def create_event_route(name: str, location: str, start_time: date | None = None, end_time: date | None = None):
+async def create_event_route(name: str, location: str, start_time: date | None = None, end_time: date | None = None, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await create_event(conn, name, location, start_time, end_time)
     if not result:
@@ -254,7 +254,7 @@ async def create_event_route(name: str, location: str, start_time: date | None =
     return dict(result)
 
 @app.put("/event/{event_id}")
-async def update_event_route(event_id: str, location: str | None = None, start_time: date | None = None, end_time: date | None = None):
+async def update_event_route(event_id: str, location: str | None = None, start_time: date | None = None, end_time: date | None = None, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await update_event(conn, event_id, location, start_time, end_time)
     if result == "UPDATE 0":
@@ -262,7 +262,7 @@ async def update_event_route(event_id: str, location: str | None = None, start_t
     return {"message": "Event updated successfully"}
 
 @app.delete("/event/{event_id}")
-async def delete_event_route(event_id: str):
+async def delete_event_route(event_id: str, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_event(conn, event_id)
     if result == "DELETE 0":
@@ -290,7 +290,7 @@ async def get_event_route(event_id: str):
 # ---------------------------------------------------
 
 @app.post("/event/{event_id}/register")
-async def create_registration_route(event_id: str, user_id: str):
+async def create_registration_route(event_id: str, user_id: str, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await create_registration(conn, event_id, user_id)
     if not result:
@@ -298,7 +298,7 @@ async def create_registration_route(event_id: str, user_id: str):
     return dict(result)
 
 @app.delete("/event/{event_id}/register/{user_id}")
-async def delete_registration_route(event_id: str, user_id: str):
+async def delete_registration_route(event_id: str, user_id: str, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_registration(conn, event_id, user_id)
     if result == "DELETE 0":
@@ -323,7 +323,7 @@ async def get_registrations_by_user_route(user_id: str):
 
 # ---------------------------------------------------
 
-async def create_result(conn, event_id, user_id, completion_time=None, recorded_at=None):
+async def create_result(conn, event_id, user_id, completion_time=None, recorded_at=None, current_user: str = Depends(get_current_user)):
     result = await conn.fetchrow('''
         INSERT INTO event_results(event_id, user_id, completion_time, recorded_at)
         VALUES($1, $2, $3, $4)
@@ -332,7 +332,7 @@ async def create_result(conn, event_id, user_id, completion_time=None, recorded_
 
     return str(result["result_id"])
 
-async def update_result(conn, result_id: uuid.UUID, completion_time=None, recorded_at=None):
+async def update_result(conn, result_id: uuid.UUID, completion_time=None, recorded_at=None, current_user: str = Depends(get_current_user)):
     element_updates = {}
     if completion_time is not None:
         element_updates["completion_time"] = completion_time

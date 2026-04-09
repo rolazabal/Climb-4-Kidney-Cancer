@@ -77,11 +77,11 @@ def to_user_key(filename_or_key: str) -> str:
 
 async def create_user(conn, email, username, dob, bio = None, profile_photo_media_id = None):
     row = await conn.fetchrow('''
-        INSERT INTO users(email, username, dob, bio, profile_photo_media_id) 
-        VALUES($1, $2, $3, $4, $5) 
+        INSERT INTO users(email, username, dob, bio, profile_photo_media_id)
+        VALUES($1, $2, $3, $4, $5)
         RETURNING uuid
     ''', email, username, dob, bio, profile_photo_media_id)
-    
+
     user_id = row["uuid"]
 
     # create default settings row
@@ -156,10 +156,10 @@ async def lifespan(app: FastAPI):
     # startup
     app.state.pool = await asyncpg.create_pool(DBurl)
     async with app.state.pool.acquire() as conn:
-        
+
         # enable UUID generation
         await conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
-        
+
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users(
                 uuid uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -177,7 +177,7 @@ async def lifespan(app: FastAPI):
                     notification_on boolean NOT NULL DEFAULT true
                 )
         """)
-    
+
     yield
 
     # shutdown
@@ -204,7 +204,7 @@ async def add_user(users: User):
             users.bio,
             users.profile_photo_media_id
         )
-        
+
     return {"id": new_id}
 
 # get user by id
@@ -286,7 +286,7 @@ async def get_user_image_url(user_id: str, current_user: str = Depends(get_curre
         )
     if not row or not row["profile_photo_media_id"]:
         raise HTTPException(404, "Image not found")
-    
+
     # DB stores filename like "user123photo.jpg"
     key = to_user_key(row["profile_photo_media_id"])  # -> "UserImages/user123photo.jpg"
     return {"url": presigned_get_url(key)}
@@ -304,7 +304,7 @@ async def get_user_by_email(email: str):
             raise HTTPException(status_code=404, detail="User not found")
 
         return dict(user)
-    
+
 app.include_router(router, prefix="/users", tags=["users"])
 
 
