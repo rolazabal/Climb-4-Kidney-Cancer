@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
+import { MOUNTAINS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
 
 const c = Colors.light;
@@ -19,21 +19,12 @@ type InProgressMountain = Mountain & {
   isPaused: boolean;
 };
 
-type ProgressClimbRecord = {
-  climb_uuid: string;
-  mountain_id: string;
-  height: number;
-  status?: "active" | "inactive" | "complete";
-};
-
-type MountainDetail = {
+type MountainRecord = {
   uuid: string;
   name?: string;
   location?: string;
   height?: number;
 };
-
-const DUMMY_USER_ID = "dba1478d-d529-4a6b-92f0-a810b7ce9e97";
 
 const initialInProgressMountains: InProgressMountain[] = [
   {
@@ -62,29 +53,11 @@ function Climbs() {
     [inProgressMountains]
   );
 
-  async function getUserClimbs(userId: string): Promise<ProgressClimbRecord[]> {
-    const response = await fetch(`${PROGRESS_URL}/progress/user/${userId}`);
-
-    if (response.status === 404) {
-      return [];
-    }
+  async function getAllMountains(): Promise<MountainRecord[]> {
+    const response = await fetch(`${MOUNTAINS_URL}/mountains`);
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch climbs: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
-  async function getMountainDetail(mountainId: string): Promise<MountainDetail | null> {
-    const response = await fetch(`${MOUNTAINS_URL}/mountains/${mountainId}`);
-
-    if (response.status === 404) {
-      return null;
-    }
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch mountain ${mountainId}: ${response.status}`);
+      throw new Error(`Failed to fetch mountains: ${response.status}`);
     }
 
     return response.json();
@@ -95,26 +68,21 @@ function Climbs() {
     setAvailableClimbsError(null);
 
     try {
-      const climbs = await getUserClimbs(DUMMY_USER_ID);
-
-      const mountains = await Promise.all(
-        climbs.map(async (climb) => {
-          const detail = await getMountainDetail(climb.mountain_id);
-
-          return {
-            id: climb.climb_uuid,
-            name: detail?.name ?? `Mountain ${climb.mountain_id.slice(0, 8)}`,
-            range: detail?.location ?? "Unknown location",
-            elevationFt: Math.round(Number(detail?.height ?? climb.height ?? 0)),
-          };
-        })
-      );
-
+      const mountains = await getAllMountains();
       const inProgressIds = new Set(inProgressMountains.map((mountain) => mountain.id));
-      setAvailableMountains(mountains.filter((mountain) => !inProgressIds.has(mountain.id)));
+      const nextAvailableMountains = mountains
+        .map((mountain) => ({
+          id: mountain.uuid,
+          name: mountain.name ?? "Unnamed Mountain",
+          range: mountain.location ?? "Unknown location",
+          elevationFt: Math.round(Number(mountain.height ?? 0)),
+        }))
+        .filter((mountain) => !inProgressIds.has(mountain.id));
+
+      setAvailableMountains(nextAvailableMountains);
     } catch (error) {
       console.log("Failed to load available climbs:", error);
-      setAvailableClimbsError("Could not load climbs right now.");
+      setAvailableClimbsError("Could not load mountains right now.");
       setAvailableMountains([]);
     } finally {
       setIsLoadingAvailableClimbs(false);

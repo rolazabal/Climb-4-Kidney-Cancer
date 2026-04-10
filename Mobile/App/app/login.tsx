@@ -1,4 +1,3 @@
-import { Link } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,14 +6,20 @@ import { Colors } from "@/constants/theme";
 const c = Colors.light;
 
 export default function LoginScreen() {
+  const [mode, setMode] = useState<"login" | "create">("login");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const isCreatingAccount = mode === "create";
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.content}>
-        <Text style={styles.pageTitle}>Log In</Text>
-        <Text style={styles.pageSubtitle}>Enter your email and username to continue.</Text>
+        <Text style={styles.pageTitle}>{isCreatingAccount ? "Create Account" : "Log In"}</Text>
+        <Text style={styles.pageSubtitle}>
+          {isCreatingAccount
+            ? "Set an email and username for your new account."
+            : "Enter your email and username to continue."}
+        </Text>
 
         <View style={styles.formCard}>
           <Text style={styles.label}>Email</Text>
@@ -32,24 +37,31 @@ export default function LoginScreen() {
           <TextInput
             autoCapitalize="none"
             onChangeText={setUsername}
-            placeholder="username"
+            placeholder={isCreatingAccount ? "new_username" : "username"}
             placeholderTextColor={c.icon}
             style={styles.input}
             value={username}
           />
 
           <Pressable style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Log In</Text>
+            <Text style={styles.primaryButtonText}>
+              {isCreatingAccount ? "Create Account" : "Log In"}
+            </Text>
           </Pressable>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Don&apos;t have an account?</Text>
-          <Link href="/create-account" asChild>
-            <Pressable style={styles.linkButton}>
-              <Text style={styles.linkButtonText}>Create New Account</Text>
-            </Pressable>
-          </Link>
+          <Text style={styles.footerText}>
+            {isCreatingAccount ? "Already have an account?" : "Don&apos;t have an account?"}
+          </Text>
+          <Pressable
+            onPress={() => setMode((current) => (current === "login" ? "create" : "login"))}
+            style={styles.linkButton}
+          >
+            <Text style={styles.linkButtonText}>
+              {isCreatingAccount ? "Back to Log In" : "Create New Account"}
+            </Text>
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>
