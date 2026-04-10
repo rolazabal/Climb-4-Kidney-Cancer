@@ -1,14 +1,19 @@
-FROM python:3.11
+FROM python:3.11-slim
+
+# Env settings
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY . .
-
+# Copy requirements first (for caching)
 COPY requirements.txt .
 
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir fastapi uvicorn asyncpg httpx
+# Copy the rest of the app
+COPY . .
 
-# Default (will be overridden by docker-compose)
-CMD ["uvicorn"]
+# Default command (overridden by docker-compose)
+CMD ["uvicorn", "Services.Gateway.gateway:app", "--host", "0.0.0.0", "--port", "8000"]

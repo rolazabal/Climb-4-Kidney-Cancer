@@ -6,12 +6,27 @@ import asyncio
 import uuid
 import httpx
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Depends, Body
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
 from pydantic import BaseModel
 from datetime import date
 from enum import Enum
 
 from Services.config import USERS_SERVICE_URL, MOUNTAINS_SERVICE_URL # For http/ports
+
+# Security
+security = HTTPBearer()
+
+SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
+ALGORITHM = "HS256"
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload["sub"]
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 # SCHEMA (Users)
@@ -181,10 +196,7 @@ async def list_all_climbs(conn):
 # LIFESPAN
 # --------------
 
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-
-DBurl = f"postgresql://{DB_USER}:{DB_PASSWORD}@progress-db:5432/progress_service"
+DBurl = os.getenv("DATABASE_URL")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -200,6 +212,10 @@ async def lifespan(app: FastAPI):
                     CREATE TYPE climb_status AS ENUM ('active', 'inactive', 'complete');
                 END IF;
             END$$;
+        """)
+
+        await conn.execute("""
+            DROP TABLE IF EXISTS climbs CASCADE;
         """)
 
         await conn.execute("""
@@ -252,7 +268,7 @@ async def get_progress(user_id: uuid.UUID):
     return dict(result)
 
 @app.post("/user-progress/update/{user_id}")
-async def update_progress(user_id: uuid.UUID, delta: ProgressDelta):
+async def update_progress(user_id: uuid.UUID, delta: ProgressDelta, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await apply_progress_update(
             conn,
@@ -276,21 +292,33 @@ async def delete_progress(user_id: uuid.UUID):
 
 
 @app.post("/progress")
-async def create_climb(climb: ClimbProgress):
+async def create_climb(climb: ClimbProgress, current_user: str = Depends(get_current_user)):
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=5.0) as client:
         
-        # Check if user exists
-        user_response = await client.get(
-            f"{USERS_SERVICE_URL}/users/id/{climb.user_id}"
-        )
+        try:
+            user_response = await client.get(
+                f"{USERS_SERVICE_URL}/users/id/{climb.user_id}"
+            )
+            
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Users service timed out")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Users service unreachable")
+        
         if user_response.status_code != 200:
             raise HTTPException(status_code=400, detail="Invalid User ID")
         
-        # Check if mountain exists
-        mountain_response = await client.get(
-            f"{MOUNTAINS_SERVICE_URL}/mountains/{climb.mountain_id}"
-        )
+        try:
+            # Check if mountain exists
+            mountain_response = await client.get(
+                f"{MOUNTAINS_SERVICE_URL}/mountains/{climb.mountain_id}"
+            )
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=504, detail="Mountains service timed out")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Mountains service unreachable")
+        
         if mountain_response.status_code != 200:
             raise HTTPException(status_code=400, detail="Invalid Mountain ID")
 
@@ -349,7 +377,7 @@ async def get_active_climbs_by_user(user_id: uuid.UUID):
 
 # delete climb entry
 @app.delete("/progress/id/{climb_id}")
-async def delete_climb_by_id(climb_id: uuid.UUID):
+async def delete_climb_by_id(climb_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_climb(conn, climb_id)
 
@@ -360,7 +388,7 @@ async def delete_climb_by_id(climb_id: uuid.UUID):
 
 # delete all of a user's climb entries
 @app.delete("/progress/user/{user_id}")
-async def delete_user(user_id: uuid.UUID):
+async def delete_user(user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_climbs_by_user(conn, user_id)
 
@@ -382,7 +410,7 @@ async def delete_mountain(mountain_id: uuid.UUID):
 
 # update climb entry
 @app.patch("/progress/update/{climb_id}")
-async def patch_climb(climb_id: uuid.UUID, patch: ClimbProgressUpdate):
+async def patch_climb(climb_id: uuid.UUID, patch: ClimbProgressUpdate, current_user: str = Depends(get_current_user)):
 
     data = patch.dict(exclude_unset=True)
 
@@ -393,3 +421,12 @@ async def patch_climb(climb_id: uuid.UUID, patch: ClimbProgressUpdate):
         raise HTTPException(404, "Climb not found")
 
     return {"message": "Climb updated"}
+
+@app.get("/health")
+async def health():
+    try:
+        async with app.state.pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")

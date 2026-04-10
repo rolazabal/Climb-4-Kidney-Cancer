@@ -10,20 +10,9 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "infoPlist": {
-        "NSHealthShareUsageDescription": "This app reads your health activity data to track climb progress.",
-        "NSHealthUpdateUsageDescription": "This app can use health activity data to personalize your climb stats."
-      },
-      "entitlements": {
-        "com.apple.developer.healthkit": true
-      },
       "bundleIdentifier": "com.anonymous.App"
     },
     "android": {
-      "permissions": [
-        "android.permission.health.READ_STEPS",
-        "android.permission.health.READ_DISTANCE"
-      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
