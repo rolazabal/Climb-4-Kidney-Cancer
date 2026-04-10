@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
 
 const c = Colors.light;
@@ -17,12 +19,21 @@ type InProgressMountain = Mountain & {
   isPaused: boolean;
 };
 
-const initialAvailableMountains: Mountain[] = [
-  { id: "bierstadt", name: "Mt. Bierstadt", range: "Colorado, USA", elevationFt: 14066 },
-  { id: "lobuche", name: "Lobuche Peak", range: "Khumbu, Nepal", elevationFt: 20075 },
-  { id: "rainier", name: "Mt. Rainier", range: "Washington, USA", elevationFt: 14411 },
-  { id: "aconcagua", name: "Aconcagua", range: "Mendoza, Argentina", elevationFt: 22838 },
-];
+type ProgressClimbRecord = {
+  climb_uuid: string;
+  mountain_id: string;
+  height: number;
+  status?: "active" | "inactive" | "complete";
+};
+
+type MountainDetail = {
+  uuid: string;
+  name?: string;
+  location?: string;
+  height?: number;
+};
+
+const DUMMY_USER_ID = "dba1478d-d529-4a6b-92f0-a810b7ce9e97";
 
 const initialInProgressMountains: InProgressMountain[] = [
   {
@@ -37,8 +48,10 @@ const initialInProgressMountains: InProgressMountain[] = [
 
 function Climbs() {
   const [isSelectingMountain, setIsSelectingMountain] = useState(false);
-  const [availableMountains, setAvailableMountains] = useState(initialAvailableMountains);
+  const [availableMountains, setAvailableMountains] = useState<Mountain[]>([]);
   const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
+  const [isLoadingAvailableClimbs, setIsLoadingAvailableClimbs] = useState(false);
+  const [availableClimbsError, setAvailableClimbsError] = useState<string | null>(null);
   const activeClimbs = useMemo(
     () => inProgressMountains.filter((mountain) => !mountain.isPaused),
     [inProgressMountains]
@@ -47,6 +60,71 @@ function Climbs() {
   const sortedInProgress = useMemo(
     () => [...inProgressMountains].sort((a, b) => b.progressFt / b.elevationFt - a.progressFt / a.elevationFt),
     [inProgressMountains]
+  );
+
+  async function getUserClimbs(userId: string): Promise<ProgressClimbRecord[]> {
+    const response = await fetch(`${PROGRESS_URL}/progress/user/${userId}`);
+
+    if (response.status === 404) {
+      return [];
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch climbs: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async function getMountainDetail(mountainId: string): Promise<MountainDetail | null> {
+    const response = await fetch(`${MOUNTAINS_URL}/mountains/${mountainId}`);
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch mountain ${mountainId}: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  const loadAvailableClimbs = useCallback(async () => {
+    setIsLoadingAvailableClimbs(true);
+    setAvailableClimbsError(null);
+
+    try {
+      const climbs = await getUserClimbs(DUMMY_USER_ID);
+
+      const mountains = await Promise.all(
+        climbs.map(async (climb) => {
+          const detail = await getMountainDetail(climb.mountain_id);
+
+          return {
+            id: climb.climb_uuid,
+            name: detail?.name ?? `Mountain ${climb.mountain_id.slice(0, 8)}`,
+            range: detail?.location ?? "Unknown location",
+            elevationFt: Math.round(Number(detail?.height ?? climb.height ?? 0)),
+          };
+        })
+      );
+
+      const inProgressIds = new Set(inProgressMountains.map((mountain) => mountain.id));
+      setAvailableMountains(mountains.filter((mountain) => !inProgressIds.has(mountain.id)));
+    } catch (error) {
+      console.log("Failed to load available climbs:", error);
+      setAvailableClimbsError("Could not load climbs right now.");
+      setAvailableMountains([]);
+    } finally {
+      setIsLoadingAvailableClimbs(false);
+    }
+  }, [inProgressMountains]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAvailableClimbs();
+    }, [loadAvailableClimbs])
   );
 
   const startClimb = (mountain: Mountain) => {
@@ -142,7 +220,11 @@ function Climbs() {
         {isSelectingMountain ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Not Started</Text>
-            {availableMountains.length === 0 ? (
+            {isLoadingAvailableClimbs ? (
+              <Text style={styles.emptyStateText}>Loading climbs...</Text>
+            ) : availableClimbsError ? (
+              <Text style={styles.emptyStateText}>{availableClimbsError}</Text>
+            ) : availableMountains.length === 0 ? (
               <Text style={styles.emptyStateText}>No mountains left to start right now.</Text>
             ) : (
               availableMountains.map((mountain) => (
