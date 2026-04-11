@@ -53,8 +53,9 @@ class User(BaseModel):
     dob: date | None = None
     bio: str | None = None
     profile_photo_media_id: str | None = None
-    role: str = "user"
-    
+    # role is intentionally excluded — always set to "user" on creation.
+    # Use the admin-only PATCH /users/{user_id}/role endpoint to promote users.
+
     @field_validator("username")
     @classmethod
     def username_valid(cls, v):
@@ -65,8 +66,8 @@ class User(BaseModel):
         if not v.replace("_", "").isalnum():
             raise ValueError("Username can only contain letters, numbers, and underscores")
         return v
-    
-    
+
+
     @field_validator("bio")
     @classmethod
     def bio_valid(cls, v):
@@ -80,6 +81,17 @@ class UserPatch(BaseModel):
     dob: date | None = None
     bio: str | None = None
     profile_photo_media_id: str | None = None
+
+class UserRolePatch(BaseModel):
+    role: str
+
+    @field_validator("role")
+    @classmethod
+    def role_valid(cls, v):
+        allowed = {"user", "admin"}
+        if v not in allowed:
+            raise ValueError(f"Role must be one of: {allowed}")
+        return v
 
 class UserSettings(BaseModel):
     user_id: uuid.UUID
@@ -223,7 +235,19 @@ async def lifespan(app: FastAPI):
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
         """)
-    
+
+        # Seed initial admin from environment variable
+        initial_admin_email = os.getenv("INITIAL_ADMIN_EMAIL")
+        if initial_admin_email:
+            updated = await conn.execute(
+                "UPDATE users SET role = 'admin' WHERE email = $1 AND role != 'admin'",
+                initial_admin_email
+            )
+            if updated.endswith("0"):
+                print(f"[seed] No user found with email '{initial_admin_email}' — skipping admin seed.")
+            else:
+                print(f"[seed] '{initial_admin_email}' promoted to admin.")
+
     yield
 
     # shutdown
@@ -288,7 +312,7 @@ async def add_user(users: User):
             users.dob,
             users.bio,
             users.profile_photo_media_id,
-            users.role
+            role="user"  # always force "user" — role cannot be set by the client
         )
 
     return {"id": new_id}
@@ -330,7 +354,11 @@ async def delete_user(user_id: uuid.UUID, current_user: dict = Depends(require_a
 
 # update user entry
 @router.patch("/{user_id}")
-async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: str = Depends(get_current_user)):
+async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: dict = Depends(get_current_user)):
+    # Only the user themselves or an admin may update a profile
+    if current_user.get("role") != "admin" and current_user.get("sub") != str(user_id):
+        raise HTTPException(status_code=403, detail="You can only update your own profile")
+
     data = patch.model_dump(exclude_unset=True, exclude_none=True)
     if "url" in data:
         data["image_url"] = data.pop("url")
@@ -340,6 +368,18 @@ async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: str = D
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
+
+# update user role (admin only)
+@router.patch("/{user_id}/role")
+async def update_user_role(user_id: uuid.UUID, body: UserRolePatch, current_user: dict = Depends(require_admin)):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET role = $1 WHERE uuid = $2",
+            body.role, user_id
+        )
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+    return {"message": f"User role updated to '{body.role}'"}
 
 # get all users
 @router.get("/")
