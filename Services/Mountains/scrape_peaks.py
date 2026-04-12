@@ -3,6 +3,8 @@ import re
 import json
 import mimetypes
 from typing import Optional
+from dotenv import load_dotenv
+load_dotenv()
 
 import boto3
 import httpx
@@ -15,6 +17,7 @@ MOUNTAINS_API_URL = "https://climb-4-kidney-cancer-production-fde3.up.railway.ap
 S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
 S3_REGION = os.getenv("S3_REGION", "us-east-2")
 MOUNTAIN_PREFIX = "MountainsImages/"
+MOUNTAINS_API_TOKEN = os.getenv("MOUNTAINS_API_TOKEN") or os.getenv("AUTH_TOKEN")
 
 DRY_RUN = False  # True면 print + json만 저장, False면 S3 업로드 + API POST까지 실행
 
@@ -173,9 +176,17 @@ def post_mountain_to_api(mountain: dict) -> dict:
         "description": mountain["description"],
         "url": mountain["s3_key"],
     }
+    headers = {}
+
+    if not MOUNTAINS_API_TOKEN:
+        raise ValueError(
+            "Missing MOUNTAINS_API_TOKEN (or AUTH_TOKEN) for authenticated mountain import."
+        )
+
+    headers["Authorization"] = f"Bearer {MOUNTAINS_API_TOKEN}"
 
     with httpx.Client(timeout=30.0) as client:
-        resp = client.post(MOUNTAINS_API_URL, json=payload)
+        resp = client.post(MOUNTAINS_API_URL, json=payload, headers=headers)
         resp.raise_for_status()
         return resp.json()
 
