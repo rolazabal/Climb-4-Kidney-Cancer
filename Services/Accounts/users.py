@@ -212,7 +212,8 @@ async def lifespan(app: FastAPI):
                 bio TEXT,
                 profile_photo_media_id varchar(255),
                 email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-                role TEXT NOT NULL DEFAULT 'user'
+                role TEXT NOT NULL DEFAULT 'user',
+                is_banned BOOLEAN NOT NULL DEFAULT FALSE
             )
         """)
 
