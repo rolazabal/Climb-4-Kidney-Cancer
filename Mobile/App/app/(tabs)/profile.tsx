@@ -3,6 +3,8 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@/constants/theme";
+import { initHealthKit,getFlightsClimbed } from "@/lib/healthkitService";
+import { useEffect, useState } from "react";
 
 type StatItem = {
   id: string;
@@ -18,15 +20,43 @@ const profile = {
   longestStreak: 0,
 };
 
-const stats: StatItem[] = [
-  { id: "1", icon: "triangle-outline", label: "Mountains Climbed", value: 0 },
-  { id: "2", icon: "trending-up-outline", label: "Total Flights", value: 0 },
-  { id: "3", icon: "locate-outline", label: "Total Elevation (ft)", value: 0 },
-  { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: 0 },
-];
 const c = Colors.light;
-
 function ProfilePage() {
+  const [stats, setStats] = useState<StatItem[]>([
+    { id: "1", icon: "triangle-outline", label: "Mountains Climbed", value: 0 },
+    { id: "2", icon: "trending-up-outline", label: "Total Flights", value: 0 },
+    { id: "3", icon: "locate-outline", label: "Total Elevation (ft)", value: 0 },
+    { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: 0 },
+  ]);
+
+  useEffect(() => {
+    const loadHealthData = async () => {
+      try {
+        //trigger HealthKit authorization and data retrieval
+        await initHealthKit();
+        //get flights climbed in the past week.
+        const results: any = await getFlightsClimbed(
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          new Date().toISOString()
+        );
+
+        const totalFlights = results?.value || 0;
+        const elevation = totalFlights * 10; // approx feet per flight
+        
+        setStats([
+          { id: "1", icon: "triangle-outline", label: "Mountains Climbed", value: Math.floor(elevation / 3000) },
+          { id: "2", icon: "trending-up-outline", label: "Total Flights", value: totalFlights },
+          { id: "3", icon: "locate-outline", label: "Total Elevation (ft)", value: elevation },
+          { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: elevation },
+        ]);
+      } catch (err) {
+        console.log("HealthKit error:", err);
+      }
+    };
+
+    loadHealthData();
+  }, []);
+
   const params = useLocalSearchParams<{ username?: string; email?: string }>();
   const username =
     typeof params.username === "string" && params.username.trim().length > 0

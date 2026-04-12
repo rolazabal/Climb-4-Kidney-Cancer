@@ -8,19 +8,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.App"
     },
-    // "android": {
-    //   "adaptiveIcon": {
-    //     "backgroundColor": "#E6F4FE",
-    //     "foregroundImage": "./assets/images/android-icon-foreground.png",
-    //     "backgroundImage": "./assets/images/android-icon-background.png",
-    // //     "monochromeImage": "./assets/images/android-icon-monochrome.png"
-    // //   },
-    //   "edgeToEdgeEnabled": true,
-    //   "predictiveBackGestureEnabled": false,
-    //   "package": "com.anonymous.App"
-    // },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
@@ -43,7 +33,30 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "expo": {
+      "ios": {
+        "infoPlist": {
+          "NSHealthShareUsageDescription": "Track your climbing progress using Health data",
+          "NSHealthUpdateUsageDescription": "Update climbing stats based on activity"
+        }
+      },
+      "plugins": [
+        [
+          "react-native-health",
+          {
+            "permissions": {
+              "read": [
+                "FlightsClimbed"
+              ],
+              "write": []
+            }
+          }
+        ]
+      ]
+    },
+    "android": {
+      "package": "com.anonymous.App"
     }
   }
 }
-

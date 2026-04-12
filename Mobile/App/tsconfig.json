@@ -6,7 +6,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    "skipLibCheck": true,
+    "types": ["react", "react-native"],
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "**/*.ts",

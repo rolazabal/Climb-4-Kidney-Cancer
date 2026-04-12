@@ -6,13 +6,20 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { KeyboardAvoidingView as RNKeyboardAvoidingView } from 'react-native';
+
+const KeyboardAvoidingView = RNKeyboardAvoidingView as React.ComponentType<{
+  style?: object;
+  behavior?: 'padding' | 'height' | 'position';
+  keyboardVerticalOffset?: number;
+  children?: React.ReactNode;
+}>;
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { User, Settings as SettingsIcon, Save, LogOut } from 'lucide-react-native';
@@ -26,6 +33,7 @@ import {
   validatePassword,
   validateBio,
 } from '@/lib/validation';
+import { Colors } from '@/constants/theme';
 
 const theme = {
   primary: 'rgb(51, 51, 51)',
@@ -35,6 +43,8 @@ const theme = {
   background: 'rgb(128, 128, 128)',
   subtle: 'rgb(102, 102, 101)',
 };
+const c = Colors.light;
+
 //bio character limit
 const BIO_MAX = 150;
 
@@ -399,10 +409,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme.primary,
-    marginBottom: 8,
+    fontSize: 44,
+    fontWeight: "700",
+    color: c.heading,
+    marginBottom: 2,
   },
   subtitle: {
     fontSize: 16,

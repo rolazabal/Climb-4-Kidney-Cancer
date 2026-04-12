@@ -1,6 +1,8 @@
 import {StyleSheet, Text, View, FlatList, TouchableOpacity} from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from 'react';
+import { TextAlignCenter } from 'lucide-react-native';
+//import { MOUNTAINS_URL, PROGRESS_URL } from '@/constants/api';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
@@ -32,11 +34,11 @@ function Progress() {
                             Activity
                         </Text>
                     </View>
-                    <View style={{flex: 3}}>
-                        <Text>
+                    <View style={{flex: 3, padding: 50}}>
+                        <Text style={[styles.label, {color: theme.accent}]}>
                             {elevation}
                         </Text>
-                        <Text>
+                        <Text style={styles.small}>
                             ft climbed today
                         </Text>
                     </View>
@@ -47,8 +49,10 @@ function Progress() {
                             Daily Quest
                         </Text>
                     </View>
-                    <View style={{flex: 3}}>
-
+                    <View style={{flex: 3, padding: 50}}>
+                        <Text style={styles.small}>
+                            Some quest info
+                        </Text>
                     </View>
                 </View>
             </View>
@@ -59,7 +63,7 @@ function Progress() {
 const styles = StyleSheet.create({
     label: {
         textAlign: 'center',
-        fontSize: 32,
+        fontSize: 44,
     },
     small: {
         textAlign: 'center',
