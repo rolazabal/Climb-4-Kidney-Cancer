@@ -1,15 +1,137 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { USERS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
+import { useAuth } from "@/context/auth";
 
 const c = Colors.light;
+
+type UserLookupResponse = {
+  uuid?: string;
+  username?: string;
+};
+
+type CreateUserResponse = {
+  id?: string;
+};
 
 export default function LoginScreen() {
   const [mode, setMode] = useState<"login" | "create">("login");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isCreatingAccount = mode === "create";
+  const { logIn } = useAuth();
+
+  const resetFormError = () => {
+    if (errorMessage) {
+      setErrorMessage(null);
+    }
+  };
+
+  async function handleLogIn() {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedUsername = username.trim();
+
+    if (!normalizedEmail || !normalizedUsername) {
+      setErrorMessage("Enter both email and username.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`${USERS_URL}/users/by-email/${encodeURIComponent(normalizedEmail)}`);
+
+      if (response.status === 404) {
+        setErrorMessage("No user found for that email.");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to log in: ${response.status}`);
+      }
+
+      const user: UserLookupResponse = await response.json();
+
+      if (!user.uuid || user.username !== normalizedUsername) {
+        setErrorMessage("Email and username do not match.");
+        return;
+      }
+
+      logIn({
+        userId: user.uuid,
+        email: normalizedEmail,
+        username: normalizedUsername,
+      });
+    } catch (error) {
+      console.log("Failed to log in:", error);
+      setErrorMessage("Could not log in right now.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleCreateAccount() {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedUsername = username.trim();
+
+    if (!normalizedEmail || !normalizedUsername) {
+      setErrorMessage("Enter both email and username.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`${USERS_URL}/users/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          username: normalizedUsername,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create user: ${response.status}`);
+      }
+
+      const result: CreateUserResponse = await response.json();
+
+      if (!result.id) {
+        throw new Error("User creation response did not include an id");
+      }
+
+      logIn({
+        userId: result.id,
+        email: normalizedEmail,
+        username: normalizedUsername,
+      });
+    } catch (error) {
+      console.log("Failed to create account:", error);
+      setErrorMessage("Could not create account right now.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleSubmit() {
+    if (isSubmitting) {
+      return;
+    }
+
+    if (isCreatingAccount) {
+      await handleCreateAccount();
+      return;
+    }
+
+    await handleLogIn();
+  }
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
@@ -26,7 +148,10 @@ export default function LoginScreen() {
           <TextInput
             autoCapitalize="none"
             keyboardType="email-address"
-            onChangeText={setEmail}
+            onChangeText={(value) => {
+              resetFormError();
+              setEmail(value);
+            }}
             placeholder="name@example.com"
             placeholderTextColor={c.icon}
             style={styles.input}
@@ -36,16 +161,21 @@ export default function LoginScreen() {
           <Text style={styles.label}>Username</Text>
           <TextInput
             autoCapitalize="none"
-            onChangeText={setUsername}
+            onChangeText={(value) => {
+              resetFormError();
+              setUsername(value);
+            }}
             placeholder={isCreatingAccount ? "new_username" : "username"}
             placeholderTextColor={c.icon}
             style={styles.input}
             value={username}
           />
 
-          <Pressable style={styles.primaryButton}>
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+          <Pressable onPress={handleSubmit} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>
-              {isCreatingAccount ? "Create Account" : "Log In"}
+              {isSubmitting ? "Submitting..." : isCreatingAccount ? "Create Account" : "Log In"}
             </Text>
           </Pressable>
         </View>
@@ -55,7 +185,10 @@ export default function LoginScreen() {
             {isCreatingAccount ? "Already have an account?" : "Don&apos;t have an account?"}
           </Text>
           <Pressable
-            onPress={() => setMode((current) => (current === "login" ? "create" : "login"))}
+            onPress={() => {
+              setErrorMessage(null);
+              setMode((current) => (current === "login" ? "create" : "login"));
+            }}
             style={styles.linkButton}
           >
             <Text style={styles.linkButtonText}>
@@ -128,6 +261,11 @@ const styles = StyleSheet.create({
     color: c.onPrimary,
     fontSize: 16,
     fontWeight: "700",
+  },
+  errorText: {
+    color: c.error,
+    fontSize: 14,
+    marginBottom: 12,
   },
   footer: {
     marginTop: 24,

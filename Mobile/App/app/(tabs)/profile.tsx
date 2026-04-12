@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Stack } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Stack, useFocusEffect } from "expo-router";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
 import { Colors } from "@/constants/theme";
 import { USERS_URL } from "@/constants/api";
+import { useAuth } from "@/context/auth";
 
 type StatItem = {
   id: string;
@@ -18,8 +18,6 @@ type UserProfile = {
   username: string;
   email: string;
 };
-
-const USER_ID = "dba1478d-d529-4a6b-92f0-a810b7ce9e97";
 
 const fallbackProfile: UserProfile = {
   username: "Username",
@@ -37,17 +35,23 @@ const c = Colors.light;
 
 function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile>(fallbackProfile);
+  const { email, username, userId, logOut } = useAuth();
 
-  async function loadUserProfile() {
-    if (!USER_ID) {
+  const loadUserProfile = useCallback(async () => {
+    if (!email) {
+      setProfile(fallbackProfile);
       return;
     }
 
     try {
-      const res = await fetch(`${USERS_URL}/users/id/${USER_ID}`);
+      const res = await fetch(`${USERS_URL}/users/by-email/${encodeURIComponent(email)}`);
 
       if (!res.ok) {
-        throw new Error(`Failed to fetch user profile: ${res.status}`);
+        setProfile({
+          username: username ?? fallbackProfile.username,
+          email,
+        });
+        return;
       }
 
       const data = await res.json();
@@ -59,12 +63,12 @@ function ProfilePage() {
     } catch (error) {
       console.log("Failed to load user profile:", error);
     }
-  }
+  }, [email, username]);
 
   useFocusEffect(
     useCallback(() => {
       loadUserProfile();
-    }, [])
+    }, [loadUserProfile])
   );
 
   return (
@@ -124,6 +128,14 @@ function ProfilePage() {
           <View style={styles.achievementsCard}>
             <Ionicons name="ellipse-outline" size={38} color={c.tabIconDefault} />
             <Text style={styles.achievementsText}>No achievements yet</Text>
+          </View>
+
+          <View style={styles.accountCard}>
+            <Text style={styles.accountTitle}>Account</Text>
+            <Text style={styles.accountMeta}>Current user ID: {userId ?? "None"}</Text>
+            <Pressable onPress={logOut} style={styles.logoutButton}>
+              <Text style={styles.logoutButtonText}>Log Out</Text>
+            </Pressable>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -283,6 +295,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: c.tabIconDefault,
     fontWeight: "600",
+  },
+  accountCard: {
+    backgroundColor: c.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 18,
+    shadowColor: c.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  accountTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: c.heading,
+    marginBottom: 8,
+  },
+  accountMeta: {
+    fontSize: 14,
+    color: c.icon,
+    marginBottom: 16,
+  },
+  logoutButton: {
+    backgroundColor: c.error,
+    borderRadius: 12,
+    minHeight: 52,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logoutButtonText: {
+    color: c.onPrimary,
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
 
