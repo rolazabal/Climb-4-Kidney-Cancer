@@ -10,7 +10,7 @@ from playwright.sync_api import sync_playwright
 
 
 PEAKS_URL = "https://climb4kc.org/peaks"
-MOUNTAINS_API_URL = os.getenv("MOUNTAINS_API_URL", "http://127.0.0.1:8002/mountains")
+MOUNTAINS_API_URL = "https://climb-4-kidney-cancer-production-fde3.up.railway.app/mountains/mountains"
 
 S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
 S3_REGION = os.getenv("S3_REGION", "us-east-2")
@@ -50,6 +50,12 @@ def get_extension(image_url: str, content_type: Optional[str]) -> str:
 def build_filename(name: str, image_url: str, content_type: Optional[str]) -> str:
     ext = get_extension(image_url, content_type)
     return f"{slugify(name)}{ext}"
+
+
+def build_s3_key(name: str, image_url: str, content_type: Optional[str]) -> str:
+    mountain_slug = slugify(name)
+    filename = build_filename(name, image_url, content_type)
+    return f"{MOUNTAIN_PREFIX}{mountain_slug}/{filename}"
 
 
 def parse_title_line(title_line: str) -> dict:
@@ -147,8 +153,7 @@ def upload_image_from_url_to_s3(image_url: str, mountain_name: str) -> Optional[
         resp.raise_for_status()
 
         content_type = resp.headers.get("content-type", "image/png")
-        filename = build_filename(mountain_name, image_url, content_type)
-        s3_key = f"{MOUNTAIN_PREFIX}{filename}"
+        s3_key = build_s3_key(mountain_name, image_url, content_type)
 
         s3.put_object(
             Bucket=S3_BUCKET,
@@ -220,7 +225,11 @@ def main():
                     parsed["source_image_url"] or "",
                     None,
                 )
-                parsed["s3_key"] = f"{MOUNTAIN_PREFIX}{parsed['filename']}"
+                parsed["s3_key"] = build_s3_key(
+                    parsed["name"],
+                    parsed["source_image_url"] or "",
+                    None,
+                )
                 results.append(parsed)
                 continue
 
