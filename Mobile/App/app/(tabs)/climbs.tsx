@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
+import { useAuth } from "@/context/auth";
 
 const c = Colors.light;
 
@@ -12,6 +13,7 @@ type Mountain = {
   name: string;
   range: string;
   elevationFt: number;
+  group: string | null;
 };
 
 type InProgressMountain = Mountain & {
@@ -24,6 +26,7 @@ type ProgressClimbRecord = {
   mountain_id: string;
   height: number;
   status?: "active" | "inactive" | "complete";
+  group: string | null;
 };
 
 type MountainDetail = {
@@ -33,20 +36,20 @@ type MountainDetail = {
   height?: number;
 };
 
-const DUMMY_USER_ID = "dba1478d-d529-4a6b-92f0-a810b7ce9e97";
-
 const initialInProgressMountains: InProgressMountain[] = [
   {
     id: "elbert",
     name: "Mt. Elbert",
     range: "Colorado, USA",
     elevationFt: 14440,
+    group: null,
     progressFt: 4520,
     isPaused: false,
   },
 ];
 
 function Climbs() {
+  const { userId } = useAuth();
   const [isSelectingMountain, setIsSelectingMountain] = useState(false);
   const [availableMountains, setAvailableMountains] = useState<Mountain[]>([]);
   const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
@@ -94,11 +97,17 @@ function Climbs() {
   }
 
   const loadAvailableClimbs = useCallback(async () => {
+    if (!userId) {
+      setAvailableMountains([]);
+      setAvailableClimbsError(null);
+      return;
+    }
+
     setIsLoadingAvailableClimbs(true);
     setAvailableClimbsError(null);
 
     try {
-      const climbs = await getUserClimbs(DUMMY_USER_ID);
+      const climbs = await getUserClimbs(userId);
 
       const mountains = await Promise.all(
         climbs.map(async (climb) => {
@@ -109,6 +118,7 @@ function Climbs() {
             name: detail?.name ?? `Mountain ${climb.mountain_id.slice(0, 8)}`,
             range: detail?.location ?? "Unknown location",
             elevationFt: Math.round(Number(detail?.height ?? climb.height ?? 0)),
+            group: climb.group,
           };
         })
       );
@@ -122,7 +132,7 @@ function Climbs() {
     } finally {
       setIsLoadingAvailableClimbs(false);
     }
-  }, [inProgressMountains]);
+  }, [inProgressMountains, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -233,6 +243,7 @@ function Climbs() {
               availableMountains.map((mountain) => (
                 <View key={mountain.id} style={styles.card}>
                   <View>
+                    <Text style={styles.climbTypeLabel}>{mountain.group ?? "Individual climb"}</Text>
                     <Text style={styles.cardTitle}>{mountain.name}</Text>
                     <Text style={styles.cardSubtitle}>{mountain.range}</Text>
                     <Text style={styles.cardMeta}>Elevation: {mountain.elevationFt.toLocaleString()} ft</Text>
@@ -259,6 +270,7 @@ function Climbs() {
               const progressPct = Math.round(progressRatio * 100);
               return (
                 <View key={mountain.id} style={styles.card}>
+                  <Text style={styles.climbTypeLabel}>{mountain.group ?? "Individual climb"}</Text>
                   <Text style={styles.cardTitle}>{mountain.name}</Text>
                   <Text style={styles.cardSubtitle}>{mountain.range}</Text>
                   <Text style={styles.cardMeta}>
@@ -354,6 +366,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: c.heading,
+  },
+  climbTypeLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.tint,
+    marginBottom: 6,
+    textTransform: "uppercase",
   },
   cardSubtitle: {
     fontSize: 15,
