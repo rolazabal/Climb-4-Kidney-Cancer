@@ -36,6 +36,18 @@ type MountainDetail = {
   height?: number;
 };
 
+type LeaderGroup = {
+  id: string;
+  name: string;
+};
+
+const mockLeaderGroupsByUserId: Record<string, LeaderGroup[]> = {
+  "dba1478d-d529-4a6b-92f0-a810b7ce9e97": [
+    { id: "kidney-krew", name: "Kidney Krew" },
+    { id: "summit-fundraisers", name: "Summit Fundraisers" },
+  ],
+};
+
 const initialInProgressMountains: InProgressMountain[] = [
   {
     id: "elbert",
@@ -55,6 +67,9 @@ function Climbs() {
   const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
   const [isLoadingAvailableClimbs, setIsLoadingAvailableClimbs] = useState(false);
   const [availableClimbsError, setAvailableClimbsError] = useState<string | null>(null);
+  const [selectedClimbAudience, setSelectedClimbAudience] = useState<string>("individual");
+  const leaderGroups = useMemo(() => (userId ? mockLeaderGroupsByUserId[userId] ?? [] : []), [userId]);
+  const leaderGroupNames = useMemo(() => new Set(leaderGroups.map((group) => group.name)), [leaderGroups]);
   const activeClimbs = useMemo(
     () => inProgressMountains.filter((mountain) => !mountain.isPaused),
     [inProgressMountains]
@@ -63,6 +78,11 @@ function Climbs() {
   const sortedInProgress = useMemo(
     () => [...inProgressMountains].sort((a, b) => b.progressFt / b.elevationFt - a.progressFt / a.elevationFt),
     [inProgressMountains]
+  );
+
+  const canCurrentUserEditClimb = useCallback(
+    (mountain: InProgressMountain) => mountain.group === null || leaderGroupNames.has(mountain.group),
+    [leaderGroupNames]
   );
 
   async function getUserClimbs(userId: string): Promise<ProgressClimbRecord[]> {
@@ -79,18 +99,14 @@ function Climbs() {
     return response.json();
   }
 
-  async function getMountainDetail(mountainId: string): Promise<MountainDetail | null> {
-    const response = await fetch(`${MOUNTAINS_URL}/mountains/${mountainId}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+  async function getAllMountains(): Promise<MountainDetail[]> {
+    const response = await fetch(`${MOUNTAINS_URL}/mountains`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
     });
 
-    if (response.status === 404) {
-      return null;
-    }
-
     if (!response.ok) {
-      throw new Error(`Failed to fetch mountain ${mountainId}: ${response.status}`);
+      throw new Error(`Failed to fetch mountains: ${response.status}`);
     }
 
     return response.json();
@@ -108,23 +124,38 @@ function Climbs() {
 
     try {
       const climbs = await getUserClimbs(userId);
+      const allMountains = await getAllMountains();
 
-      const mountains = await Promise.all(
-        climbs.map(async (climb) => {
-          const detail = await getMountainDetail(climb.mountain_id);
-
-          return {
-            id: climb.climb_uuid,
-            name: detail?.name ?? `Mountain ${climb.mountain_id.slice(0, 8)}`,
-            range: detail?.location ?? "Unknown location",
-            elevationFt: Math.round(Number(detail?.height ?? climb.height ?? 0)),
-            group: climb.group,
-          };
-        })
+      const relevantClimbs = climbs.filter((climb) =>
+        selectedClimbAudience === "individual" ? climb.group === null : climb.group === selectedClimbAudience
       );
 
-      const inProgressIds = new Set(inProgressMountains.map((mountain) => mountain.id));
-      setAvailableMountains(mountains.filter((mountain) => !inProgressIds.has(mountain.id)));
+      const unavailableMountainIds = new Set(
+        relevantClimbs
+          .filter((climb) => climb.status === "active" || climb.status === "complete")
+          .map((climb) => climb.mountain_id)
+      );
+
+      const locallyActiveMountainNames = new Set(
+        inProgressMountains
+          .filter((mountain) =>
+            selectedClimbAudience === "individual" ? mountain.group === null : mountain.group === selectedClimbAudience
+          )
+          .map((mountain) => mountain.name)
+      );
+
+      const nextAvailableMountains = allMountains
+        .filter((mountain) => !unavailableMountainIds.has(mountain.uuid))
+        .filter((mountain) => !locallyActiveMountainNames.has(mountain.name ?? ""))
+        .map((mountain) => ({
+          id: mountain.uuid,
+          name: mountain.name ?? "Unnamed Mountain",
+          range: mountain.location ?? "Unknown location",
+          elevationFt: Math.round(Number(mountain.height ?? 0)),
+          group: selectedClimbAudience === "individual" ? null : selectedClimbAudience,
+        }));
+
+      setAvailableMountains(nextAvailableMountains);
     } catch (error) {
       console.log("Failed to load available climbs:", error);
       setAvailableClimbsError("Could not load climbs right now.");
@@ -132,7 +163,7 @@ function Climbs() {
     } finally {
       setIsLoadingAvailableClimbs(false);
     }
-  }, [inProgressMountains, userId]);
+  }, [inProgressMountains, selectedClimbAudience, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -219,7 +250,15 @@ function Climbs() {
         <Text style={styles.pageTitle}>Climbs</Text>
         <Text style={styles.pageSubtitle}>Track climbs in progress and start new routes.</Text>
 
-        <Pressable style={styles.startButton} onPress={() => setIsSelectingMountain((current) => !current)}>
+        <Pressable
+          style={styles.startButton}
+          onPress={() => {
+            if (leaderGroups.length === 0) {
+              setSelectedClimbAudience("individual");
+            }
+            setIsSelectingMountain((current) => !current);
+          }}
+        >
           <Text style={styles.startButtonText}>
             {isSelectingMountain ? "Done Selecting" : "Start New Climb"}
           </Text>
@@ -232,13 +271,60 @@ function Climbs() {
 
         {isSelectingMountain ? (
           <View style={styles.section}>
+            {leaderGroups.length > 0 ? (
+              <View style={styles.audienceSelector}>
+                <Text style={styles.audienceTitle}>Start climb for</Text>
+                <View style={styles.audienceOptions}>
+                  <Pressable
+                    onPress={() => setSelectedClimbAudience("individual")}
+                    style={[
+                      styles.audienceOption,
+                      selectedClimbAudience === "individual" && styles.audienceOptionActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.audienceOptionText,
+                        selectedClimbAudience === "individual" && styles.audienceOptionTextActive,
+                      ]}
+                    >
+                      Individual
+                    </Text>
+                  </Pressable>
+
+                  {leaderGroups.map((group) => (
+                    <Pressable
+                      key={group.id}
+                      onPress={() => setSelectedClimbAudience(group.name)}
+                      style={[
+                        styles.audienceOption,
+                        selectedClimbAudience === group.name && styles.audienceOptionActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.audienceOptionText,
+                          selectedClimbAudience === group.name && styles.audienceOptionTextActive,
+                        ]}
+                      >
+                        {group.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
             <Text style={styles.sectionTitle}>Not Started</Text>
             {isLoadingAvailableClimbs ? (
               <Text style={styles.emptyStateText}>Loading climbs...</Text>
             ) : availableClimbsError ? (
               <Text style={styles.emptyStateText}>{availableClimbsError}</Text>
             ) : availableMountains.length === 0 ? (
-              <Text style={styles.emptyStateText}>No mountains left to start right now.</Text>
+              <Text style={styles.emptyStateText}>
+                No {selectedClimbAudience === "individual" ? "individual" : selectedClimbAudience} climbs left to
+                start right now.
+              </Text>
             ) : (
               availableMountains.map((mountain) => (
                 <View key={mountain.id} style={styles.card}>
@@ -282,19 +368,23 @@ function Climbs() {
                     <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
                   </View>
 
-                  <View style={styles.actionsRow}>
-                    <Pressable style={styles.cardSecondaryButton} onPress={() => togglePause(mountain.id)}>
-                      <Text style={styles.cardSecondaryButtonText}>
-                        {mountain.isPaused ? "Resume Climb" : "Pause Climb"}
-                      </Text>
-                    </Pressable>
-                    <Pressable style={styles.cardResetButton} onPress={() => confirmResetClimb(mountain)}>
-                      <Text style={styles.cardResetButtonText}>Reset Progress</Text>
-                    </Pressable>
-                    <Pressable style={styles.cardDangerButton} onPress={() => confirmQuitClimb(mountain)}>
-                      <Text style={styles.cardDangerButtonText}>Quit Climb</Text>
-                    </Pressable>
-                  </View>
+                  {canCurrentUserEditClimb(mountain) ? (
+                    <View style={styles.actionsRow}>
+                      <Pressable style={styles.cardSecondaryButton} onPress={() => togglePause(mountain.id)}>
+                        <Text style={styles.cardSecondaryButtonText}>
+                          {mountain.isPaused ? "Resume Climb" : "Pause Climb"}
+                        </Text>
+                      </Pressable>
+                      <Pressable style={styles.cardResetButton} onPress={() => confirmResetClimb(mountain)}>
+                        <Text style={styles.cardResetButtonText}>Reset Progress</Text>
+                      </Pressable>
+                      <Pressable style={styles.cardDangerButton} onPress={() => confirmQuitClimb(mountain)}>
+                        <Text style={styles.cardDangerButtonText}>Quit Climb</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Text style={styles.readOnlyHint}>Only group leaders can manage this group climb.</Text>
+                  )}
                 </View>
               );
             })
@@ -341,6 +431,40 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     color: c.subtitle,
     fontSize: 14,
+  },
+  audienceSelector: {
+    marginBottom: 18,
+  },
+  audienceTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: c.heading,
+    marginBottom: 10,
+  },
+  audienceOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  audienceOption: {
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surface,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  audienceOptionActive: {
+    backgroundColor: c.tint,
+    borderColor: c.tint,
+  },
+  audienceOptionText: {
+    color: c.heading,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  audienceOptionTextActive: {
+    color: c.onPrimary,
   },
   section: {
     marginBottom: 20,
@@ -457,6 +581,11 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 15,
     color: c.icon,
+  },
+  readOnlyHint: {
+    marginTop: 10,
+    fontSize: 14,
+    color: c.subtitle,
   },
 });
 
