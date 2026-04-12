@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, EmailStr
+import resend
 
 # -----------------
 # ENV + CONFIG
@@ -19,6 +20,8 @@ SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+resend.api_key = os.getenv("RESEND_API_KEY")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@summitstepsapp.com")
 
 USERS_SERVICE_URL = "http://users-service:8000"
 
@@ -78,6 +81,24 @@ def verify_token(token: str):
 # For one time passwords
 def generate_otp():
     return str(secrets.randbelow(900000) + 100000)
+
+def send_otp_email(to_email: str, code: str) -> None:
+    resend.Emails.send({
+        "from": FROM_EMAIL,
+        "to": [to_email],
+        "subject": "Your login code",
+        "text": f"Your login code is {code}. It expires in 5 minutes.",
+        "html": f"""
+        <html>
+          <body>
+            <h2>Login Verification</h2>
+            <p>Your login code is:</p>
+            <p style="font-size:24px; font-weight:bold;">{code}</p>
+            <p>This code expires in 5 minutes.</p>
+          </body>
+        </html>
+        """
+    })
 
 # -----------------
 # LIFESPAN
@@ -201,8 +222,7 @@ async def request_login(payload: RequestLogin):
     )
     
 
-    # TODO: replace with real email sending
-    print(f"OTP for {payload.email}: {code}")
+    send_otp_email(payload.email, code)
 
     return {
         "message": "OTP sent"

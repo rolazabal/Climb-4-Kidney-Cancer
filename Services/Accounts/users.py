@@ -13,14 +13,12 @@ from pydantic import BaseModel, EmailStr, field_validator
 from jose import jwt, JWTError
 from pydantic import BaseModel,EmailStr
 import hashlib
+from .email_utils import send_verification_email
 
 S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
 S3_REGION = os.getenv("S3_REGION", "us-east-2")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
-SES_FROM_EMAIL = os.getenv("SES_FROM_EMAIL", "chan202220@gmail.com")
 
 s3 = boto3.client("s3", region_name=S3_REGION)
-ses = boto3.client("sesv2", region_name=AWS_REGION)
 
 USER_PREFIX = "UserImages/"
 
@@ -258,39 +256,6 @@ def generate_verification_code() -> str:
 
 def hash_verification_code(code: str) -> str:
     return hashlib.sha256(code.encode()).hexdigest()
-
-def send_verification_email(to_email: str, code: str) -> None:
-    ses.send_email(
-        FromEmailAddress=SES_FROM_EMAIL,
-        Destination={"ToAddresses": [to_email]},
-        Content={
-            "Simple": {
-                "Subject": {
-                    "Data": "Your verification code",
-                    "Charset": "UTF-8"
-                },
-                "Body": {
-                    "Text": {
-                        "Data": f"Your verification code is {code}. It expires in 10 minutes.",
-                        "Charset": "UTF-8"
-                    },
-                    "Html": {
-                        "Data": f"""
-                        <html>
-                          <body>
-                            <h2>Email Verification</h2>
-                            <p>Your verification code is:</p>
-                            <p style="font-size:24px;font-weight:bold;">{code}</p>
-                            <p>This code expires in 10 minutes.</p>
-                          </body>
-                        </html>
-                        """,
-                        "Charset": "UTF-8"
-                    }
-                }
-            }
-        }
-    )
 
 app = FastAPI(lifespan=lifespan)
 router = APIRouter()
