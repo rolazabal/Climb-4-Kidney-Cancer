@@ -129,7 +129,12 @@ async def get_user_by_email(email: str):
         if response.status_code != 200:
             return None
 
-        return response.json()
+        user = response.json()
+
+        if user.get("is_banned"):
+            raise HTTPException(status_code=403, detail="Account suspended")
+
+        return user
     
     
 async def revoke_session(redis_client, sid: str):

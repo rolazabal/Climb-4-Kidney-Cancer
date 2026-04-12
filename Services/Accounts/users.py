@@ -1,6 +1,5 @@
 ## IMPORTS
-import random as rnd
-
+import secrets
 import boto3
 import os
 import asyncpg
@@ -223,6 +222,10 @@ async def lifespan(app: FastAPI):
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
         """)
+        
+        await conn.execute("""
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE
+        """)
     
     yield
 
@@ -230,7 +233,7 @@ async def lifespan(app: FastAPI):
     await app.state.pool.close()
 
 def generate_verification_code() -> str:
-    return f"{rnd.randint(0, 999999):06d}"
+    return f"{secrets.randbelow(1000000):06d}"
 
 def hash_verification_code(code: str) -> str:
     return hashlib.sha256(code.encode()).hexdigest()
@@ -484,3 +487,25 @@ async def verify_email(req: VerifyEmailRequest):
         )
 
     return {"message": "Email verified successfully"}
+
+@router.patch("/{user_id}/ban")
+async def ban_user(user_id: uuid.UUID, current_user: dict = Depends(require_admin)):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET is_banned = TRUE WHERE uuid = $1",
+            user_id
+        )
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+    return {"message": "User banned"}
+
+@router.patch("/{user_id}/unban")
+async def unban_user(user_id: uuid.UUID, current_user: dict = Depends(require_admin)):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET is_banned = FALSE WHERE uuid = $1",
+            user_id
+        )
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+    return {"message": "User unbanned"}
