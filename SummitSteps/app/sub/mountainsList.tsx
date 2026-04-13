@@ -1,4 +1,4 @@
-import { THEME_COLORS } from '@/constants/api';
+import { MOUNTAINS_URL, THEME_COLORS } from '@/constants/api';
 import { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Mountain } from '../(tabs)/mountains';
@@ -20,64 +20,40 @@ function MountainsList({view}: {view: Function}) {
 
   async function getMountains() {
     try {
-      let res = await fetch('https://mountains-service-production.up.railway.app/mountains', {
+      let res = await fetch(MOUNTAINS_URL, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
+
       if (res.status !== 200) {
         console.log('Mountains list failed:', res.status);
         return;
       }
-      let data = await res.json();
-	    setMountains(data);
+      
+      let mountains = await res.json();
 
-      /*
-      const detailPromises = data.map((m: any) =>
-        fetch(`${MOUNTAINS_URL}/mountains/${m.uuid}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }).then(async (r) => {
-          if (!r.ok) {
-            throw new Error(`Failed to fetch detail for ${m.uuid}: ${r.status}`);
-          }
-          return r.json();
-        })
+      let imagePromises = mountains.map((mountain: Mountain) => fetch(MOUNTAINS_URL + "/" + mountain.uuid + "/image-url", {
+        method: 'GET',
+        headers: {'Content-Type': 'application/json'},
+      })
+        .then((res) => (res.status === 200 ? res.json() : null))
+        .then((data) => (data?.url ? data.url : null))
+        .catch(() => null)
       );
 
-      const details = await Promise.all(detailPromises);
+      let urls = await Promise.all(imagePromises);
 
-      const imagePromises = details.map((m: any) =>
-        fetch(`${MOUNTAINS_URL}/mountains/${m.uuid}/image-url`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        })
-          .then((r) => (r.status === 200 ? r.json() : null))
-          .then((j) => (j?.url ? j.url : null))
-          .catch(() => null)
-      );
-
-      const imageUrls = await Promise.all(imagePromises);
-
-      const newMountains: Mountain[] = details.map((m: any, idx: number) => ({
-        ...m,
-        image_presigned_url: imageUrls[idx],
+      mountains = mountains.map((mountain: Mountain, index: number) => ({
+        ...mountain,
+        image_presigned_url: urls[index],
       }));
 
-      setPeakNumber(newMountains.length);
-      setMountains(newMountains);
-      */
+      setPeakNumber(mountains.length);
+      setMountains(mountains);
     } catch (error) {
       console.log('Failed to get mountains:', error);
     }
   }
-
-  /*
-  useFocusEffect(
-    useCallback(() => {
-      getMountains();
-    }, [])
-  );
-  */
 
   useEffect(() => {
     getMountains();
@@ -90,21 +66,17 @@ function MountainsList({view}: {view: Function}) {
           <Text style={[styles.label, { color: THEME_COLORS.primary }]}>Mountains</Text>
           <Text style={styles.small}>Explore peaks and track your summits</Text>
         </View>
-
         <View style={{ flex: 2, marginVertical: 10, flexDirection: 'row' }}>
           <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.climbed)}>
             <Text style={[styles.label, { color: THEME_COLORS.accent }]}>{summits}</Text>
             <Text style={styles.small}>Summits</Text>
           </TouchableOpacity>
-
           <View style={{ flex: 1 }} />
-
           <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.all)}>
             <Text style={[styles.label, { color: THEME_COLORS.accent }]}>{peakNumber}</Text>
             <Text style={styles.small}>Total peaks</Text>
           </TouchableOpacity>
         </View>
-
         <View style={{ flex: 1, marginBottom: 10, flexDirection: 'row' }}>
           <TouchableOpacity
             style={[styles.tab, tab === Tabs.all && { backgroundColor: THEME_COLORS.accent }]}
@@ -112,7 +84,6 @@ function MountainsList({view}: {view: Function}) {
           >
             <Text style={[styles.small, tab === Tabs.all && { color: THEME_COLORS.white }]}>All</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.tab, tab === Tabs.climbed && { backgroundColor: THEME_COLORS.accent }]}
             onPress={() => setTab(Tabs.climbed)}
@@ -121,7 +92,6 @@ function MountainsList({view}: {view: Function}) {
               Climbed
             </Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.tab, tab === Tabs.toClimb && { backgroundColor: THEME_COLORS.accent }]}
             onPress={() => setTab(Tabs.toClimb)}
@@ -132,7 +102,6 @@ function MountainsList({view}: {view: Function}) {
           </TouchableOpacity>
         </View>
       </View>
-
       <View style={{ flex: 2 }}>
         {tab === Tabs.all && <MountainList arr={mountains} view={(id: string) => {view(id)}} />}
         {tab === Tabs.climbed && <MountainList arr={mountainsClimbed} view={(id: string) => {view(id)}} />}
@@ -165,11 +134,9 @@ function MountainList({ arr, view }: { arr: Mountain[], view: Function }) {
           <Text style={{ color: THEME_COLORS.secondary }}>No Image</Text>
         </View>
       )}
-
       <View style={{ padding: 15, backgroundColor: THEME_COLORS.primary }}>
         <Text style={{ fontSize: 24, color: THEME_COLORS.white }}>{mountain.name}</Text>
       </View>
-
       <View style={{ padding: 15 }}>
         <Text style={{ fontSize: 18, color: THEME_COLORS.secondary }}>
           {mountain.location ?? 'Unknown location'}

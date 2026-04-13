@@ -28,6 +28,13 @@ function RootLayout() {
     setTest(test + 1);
     try {
       let db = await getConnection();
+      let date = new Date();
+      let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $climb, $start)');
+      try {
+        await statement.executeAsync({$time: date.getTime(), $climb: 0, $start: false});
+      } finally {
+        await statement.finalizeAsync();
+      }
       let row = await db.getFirstAsync('SELECT * from times');
       console.log(row);
     } catch (error) {
@@ -41,12 +48,12 @@ function RootLayout() {
     return BackgroundTask.registerTaskAsync(DATA_TASK_ID);
   }
 
-  const updateAsync = async () => {
+  async function updateAsync() {
     const status = await BackgroundTask.getStatusAsync();
     setTaskStatus(status);
     const isRegistered = await TaskManager.isTaskRegisteredAsync(DATA_TASK_ID);
     setTaskRegistered(isRegistered);
-  };
+  }
 
   async function triggerTask() {
     await BackgroundTask.triggerTaskWorkerForTestingAsync();
@@ -72,7 +79,7 @@ function RootLayout() {
     } finally {
       await statement.finalizeAsync();
     }
-  };
+  }
 
   const appState = useRef(AppState.currentState);
 
