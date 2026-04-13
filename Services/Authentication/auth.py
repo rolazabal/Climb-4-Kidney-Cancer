@@ -146,7 +146,7 @@ app = FastAPI(lifespan=lifespan)
 async def get_user_by_email(email: str):
     async with httpx.AsyncClient(timeout=5.0) as client:
         try:
-            response = await client.get(f"{USERS_SERVICE_URL}/users/by-email/{email}")
+            response = await client.get(f"{USERS_SERVICE_URL}/by-email/{email}")
         except httpx.TimeoutException:
             raise HTTPException(status_code=504, detail="Users service timed out")
         except Exception:

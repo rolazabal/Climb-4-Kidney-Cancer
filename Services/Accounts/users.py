@@ -270,15 +270,18 @@ router = APIRouter()
 @router.post("/")
 async def add_user(users: User):
     async with app.state.pool.acquire() as conn:
-        new_id = await create_user(
-            conn,
-            users.email,
-            users.username,
-            users.dob,
-            users.bio,
-            users.profile_photo_media_id,
-            role="user"  # always force "user" — role cannot be set by the client
-        )
+        try:
+            new_id = await create_user(
+                conn,
+                users.email,
+                users.username,
+                users.dob,
+                users.bio,
+                users.profile_photo_media_id,
+                role="user"  # always force "user" — role cannot be set by the client
+            )
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(status_code=409, detail="Email or username already taken")
 
     return {"id": new_id}
 
@@ -396,7 +399,7 @@ async def get_user_by_email(email: str):
 
         return dict(user)
 
-app.include_router(router, prefix="/users", tags=["users"])
+app.include_router(router, tags=["users"])
 
 
 @app.get("/health")
