@@ -493,6 +493,17 @@ async def verify_email(req: VerifyEmailRequest):
 
     return {"message": "Email verified successfully"}
 
+@router.patch("/verify-email")
+async def verify_user_email(req: EmailRequest):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET email_verified = TRUE WHERE email = $1",
+            req.email
+        )
+    if result.endswith("0"):
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "Email verified"}
+
 @router.patch("/{user_id}/ban")
 async def ban_user(user_id: uuid.UUID, current_user: dict = Depends(require_admin)):
     async with app.state.pool.acquire() as conn:
