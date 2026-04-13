@@ -195,7 +195,9 @@ def main():
     results = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        # Should be True in production, set to False for debugging
+        # False can show to crawling process
+        browser = p.chromium.launch(headless=False) 
         page = browser.new_page()
         page.goto(PEAKS_URL, wait_until="networkidle")
 
