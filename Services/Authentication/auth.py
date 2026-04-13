@@ -222,7 +222,13 @@ async def request_login(payload: RequestLogin):
     )
     
 
-    send_otp_email(payload.email, code)
+    try:
+        send_otp_email(payload.email, code)
+    except Exception as e:
+        # Roll back rate-limit key so user can retry immediately
+        await redis_client.delete(rate_limit_key)
+        await redis_client.delete(f"auth:otp:{payload.email}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
     return {
         "message": "OTP sent"

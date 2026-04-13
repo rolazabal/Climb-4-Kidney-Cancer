@@ -25,6 +25,8 @@ services:
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      FROM_EMAIL: ${FROM_EMAIL}
     ports:
       - "8001:8000"
 
@@ -81,5 +83,7 @@ services:
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      FROM_EMAIL: ${FROM_EMAIL}
     depends_on:
       - users-service
