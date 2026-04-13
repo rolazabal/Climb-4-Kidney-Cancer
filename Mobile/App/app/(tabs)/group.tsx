@@ -34,6 +34,8 @@ type Group = {
   members: GroupMember[];
 };
 
+type ScreenMode = 'groups' | 'leaderboard';
+
 const c = Colors.light;
 
 const initialGroups: Group[] = [
@@ -90,8 +92,13 @@ function getInitials(username: string) {
     .join('');
 }
 
+function getGroupElevation(group: Group) {
+  return group.members.reduce((total, member) => total + member.elevation, 0);
+}
+
 export default function GroupPage() {
   const [groups, setGroups] = useState<Group[]>(initialGroups);
+  const [mode, setMode] = useState<ScreenMode>('groups');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -104,10 +111,15 @@ export default function GroupPage() {
 
     return groups.filter((group) => {
       const inName = group.name.toLowerCase().includes(normalized);
-      const inDescription = group.description?.toLowerCase().includes(normalized);
+      const inDescription = group.description?.toLowerCase().includes(normalized) ?? false;
       return inName || inDescription;
     });
   }, [groups, searchQuery]);
+
+  const leaderboardGroups = useMemo(
+    () => [...groups].sort((a, b) => getGroupElevation(b) - getGroupElevation(a)),
+    [groups]
+  );
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group.id === selectedGroupId) ?? null,
@@ -145,12 +157,22 @@ export default function GroupPage() {
     setIsCreateModalOpen(false);
   };
 
+  const joinGroup = (groupId: string) => {
+    setGroups((current) =>
+      current.map((group) => (group.id === groupId ? { ...group, joined: true } : group))
+    );
+  };
+
   const leaveGroup = (groupId: string) => {
     setGroups((current) =>
       current.map((group) => (group.id === groupId ? { ...group, joined: false } : group))
     );
     setSelectedGroupId(null);
   };
+
+  const rankedMembers = selectedGroup
+    ? [...selectedGroup.members].sort((a, b) => b.elevation - a.elevation)
+    : [];
 
   const renderGroupCard = ({ item }: { item: Group }) => (
     <Pressable style={styles.groupCard} onPress={() => setSelectedGroupId(item.id)}>
@@ -164,20 +186,43 @@ export default function GroupPage() {
             {item.memberCount} {item.memberCount === 1 ? 'member' : 'members'}
           </AppText>
         </View>
-        {item.joined ? (
-          <View style={styles.joinedPill}>
-            <AppText style={styles.joinedPillText}>Joined</AppText>
-          </View>
-        ) : null}
+        <Pressable
+          style={item.joined ? styles.leavePill : styles.joinPill}
+          onPress={(event) => {
+            event.stopPropagation();
+            if (item.joined) {
+              leaveGroup(item.id);
+            } else {
+              joinGroup(item.id);
+            }
+          }}>
+          <AppText style={item.joined ? styles.leavePillText : styles.joinPillText}>
+            {item.joined ? 'Leave' : 'Join'}
+          </AppText>
+        </Pressable>
       </View>
 
       {item.description ? <AppText style={styles.groupDescription}>{item.description}</AppText> : null}
+      <AppText style={styles.groupElevationSummary}>
+        {getGroupElevation(item).toLocaleString()} ft total climbed
+      </AppText>
     </Pressable>
   );
 
-  const rankedMembers = selectedGroup
-    ? [...selectedGroup.members].sort((a, b) => b.elevation - a.elevation)
-    : [];
+  const renderLeaderboardCard = ({ item, index }: { item: Group; index: number }) => (
+    <View style={styles.leaderboardEntry}>
+      <View style={styles.leaderboardRankBadge}>
+        <AppText style={styles.leaderboardRank}>{index + 1}</AppText>
+      </View>
+      <View style={styles.leaderboardMeta}>
+        <AppText style={styles.groupName}>{item.name}</AppText>
+        {item.description ? <AppText style={styles.groupDescription}>{item.description}</AppText> : null}
+        <AppText style={styles.leaderboardElevation}>
+          {getGroupElevation(item).toLocaleString()} ft total elevation
+        </AppText>
+      </View>
+    </View>
+  );
 
   if (selectedGroup) {
     return (
@@ -189,16 +234,14 @@ export default function GroupPage() {
             </Pressable>
             <View style={styles.detailHeading}>
               <AppText style={styles.title}>{selectedGroup.name}</AppText>
-              <AppText style={styles.subtitle}>Group leaderboard</AppText>
+              <AppText style={styles.subtitle}>Group members</AppText>
             </View>
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.detailContent}
-            showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
             <View style={styles.detailHero}>
-              <AppText style={styles.heroStat}>{selectedGroup.memberCount}</AppText>
-              <AppText style={styles.heroLabel}>Active members</AppText>
+              <AppText style={styles.heroStat}>{getGroupElevation(selectedGroup).toLocaleString()}</AppText>
+              <AppText style={styles.heroLabel}>Total elevation climbed</AppText>
               {selectedGroup.description ? (
                 <AppText style={styles.heroDescription}>{selectedGroup.description}</AppText>
               ) : null}
@@ -206,8 +249,8 @@ export default function GroupPage() {
 
             <View style={styles.leaderboardCard}>
               <View style={styles.sectionHeader}>
-                <Crown size={18} color={c.tint} />
-                <AppText style={styles.sectionTitle}>Leaderboard</AppText>
+                <Users size={18} color={c.tint} />
+                <AppText style={styles.sectionTitle}>Members</AppText>
               </View>
 
               {rankedMembers.map((member, index) => (
@@ -230,20 +273,26 @@ export default function GroupPage() {
               ))}
             </View>
 
-            <Pressable
-              style={styles.leaveButton}
-              onPress={() =>
-                Alert.alert('Leave group', `Leave ${selectedGroup.name}?`, [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Leave',
-                    style: 'destructive',
-                    onPress: () => leaveGroup(selectedGroup.id),
-                  },
-                ])
-              }>
-              <AppText style={styles.leaveButtonText}>Leave group</AppText>
-            </Pressable>
+            {selectedGroup.joined ? (
+              <Pressable
+                style={styles.leaveButton}
+                onPress={() =>
+                  Alert.alert('Leave group', `Leave ${selectedGroup.name}?`, [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Leave',
+                      style: 'destructive',
+                      onPress: () => leaveGroup(selectedGroup.id),
+                    },
+                  ])
+                }>
+                <AppText style={styles.leaveButtonText}>Leave group</AppText>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.joinButton} onPress={() => joinGroup(selectedGroup.id)}>
+                <AppText style={styles.joinButtonText}>Join group</AppText>
+              </Pressable>
+            )}
           </ScrollView>
         </View>
       </SafeAreaView>
@@ -258,37 +307,78 @@ export default function GroupPage() {
         <View style={styles.header}>
           <View>
             <AppText style={styles.title}>Groups</AppText>
-            <AppText style={styles.subtitle}>Find a team or create your own climbing crew.</AppText>
+            <AppText style={styles.subtitle}>Find a team, manage membership, or check the standings.</AppText>
           </View>
-          <Pressable style={styles.addButton} onPress={() => setIsCreateModalOpen(true)}>
-            <Plus size={18} color={c.onPrimary} />
+          {mode === 'groups' ? (
+            <Pressable style={styles.addButton} onPress={() => setIsCreateModalOpen(true)}>
+              <Plus size={18} color={c.onPrimary} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={styles.modeToggle}>
+          <Pressable
+            style={[styles.modeToggleButton, mode === 'groups' && styles.modeToggleButtonActive]}
+            onPress={() => setMode('groups')}>
+            <AppText style={[styles.modeToggleText, mode === 'groups' && styles.modeToggleTextActive]}>
+              Groups
+            </AppText>
+          </Pressable>
+          <Pressable
+            style={[styles.modeToggleButton, mode === 'leaderboard' && styles.modeToggleButtonActive]}
+            onPress={() => setMode('leaderboard')}>
+            <AppText
+              style={[styles.modeToggleText, mode === 'leaderboard' && styles.modeToggleTextActive]}>
+              Leaderboard
+            </AppText>
           </Pressable>
         </View>
 
-        <View style={styles.searchShell}>
-          <Search size={18} color={c.icon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search group names"
-            placeholderTextColor={c.subtitle}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
-        <FlatList
-          data={filteredGroups}
-          keyExtractor={(item) => item.id}
-          renderItem={renderGroupCard}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <AppText style={styles.emptyTitle}>No groups match that search.</AppText>
-              <AppText style={styles.emptySubtitle}>Try a different name or create a new group.</AppText>
+        {mode === 'groups' ? (
+          <>
+            <View style={styles.searchShell}>
+              <Search size={18} color={c.icon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search group names"
+                placeholderTextColor={c.subtitle}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
             </View>
-          }
-        />
+
+            <FlatList
+              data={filteredGroups}
+              keyExtractor={(item) => item.id}
+              renderItem={renderGroupCard}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <AppText style={styles.emptyTitle}>No groups match that search.</AppText>
+                  <AppText style={styles.emptySubtitle}>Try a different name or create a new group.</AppText>
+                </View>
+              }
+            />
+          </>
+        ) : (
+          <FlatList
+            data={leaderboardGroups}
+            keyExtractor={(item) => item.id}
+            renderItem={renderLeaderboardCard}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={styles.leaderboardBanner}>
+                <Crown size={22} color={c.onPrimary} />
+                <AppText style={styles.leaderboardBannerTitle}>Group standings</AppText>
+                <AppText style={styles.leaderboardBannerSubtitle}>
+                  Each group is ranked by the combined elevation climbed by all members.
+                </AppText>
+              </View>
+            }
+          />
+        )}
 
         <Modal
           visible={isCreateModalOpen}
@@ -365,7 +455,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 15,
     color: c.subtitle,
-    maxWidth: 260,
+    maxWidth: 280,
   },
   addButton: {
     width: 44,
@@ -379,6 +469,32 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 12,
     elevation: 3,
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    marginHorizontal: 18,
+    marginBottom: 14,
+    padding: 4,
+    borderRadius: 18,
+    backgroundColor: c.surfaceMuted,
+  },
+  modeToggleButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeToggleButtonActive: {
+    backgroundColor: c.surface,
+  },
+  modeToggleText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: c.subtitle,
+  },
+  modeToggleTextActive: {
+    color: c.heading,
   },
   searchShell: {
     marginHorizontal: 18,
@@ -430,6 +546,7 @@ const styles = StyleSheet.create({
   },
   groupMeta: {
     flex: 1,
+    paddingRight: 8,
   },
   groupName: {
     fontSize: 18,
@@ -441,13 +558,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: c.subtitle,
   },
-  joinedPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  joinPill: {
+    minWidth: 70,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: c.tint,
+    alignItems: 'center',
+  },
+  joinPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: c.onPrimary,
+  },
+  leavePill: {
+    minWidth: 70,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: c.surfaceWarm,
+    alignItems: 'center',
   },
-  joinedPillText: {
+  leavePillText: {
     fontSize: 12,
     fontWeight: '700',
     color: c.tint,
@@ -457,6 +589,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: c.text,
+  },
+  groupElevationSummary: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '700',
+    color: c.subtitle,
+  },
+  leaderboardBanner: {
+    backgroundColor: c.banner,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 12,
+  },
+  leaderboardBannerTitle: {
+    marginTop: 12,
+    fontSize: 24,
+    fontWeight: '700',
+    color: c.onPrimary,
+  },
+  leaderboardBannerSubtitle: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#F4E9E4',
+  },
+  leaderboardEntry: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: c.surface,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: c.border,
+    shadowColor: c.shadow,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  leaderboardRankBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: c.surfaceWarm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  leaderboardRank: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: c.tint,
+  },
+  leaderboardMeta: {
+    flex: 1,
+  },
+  leaderboardElevation: {
+    marginTop: 10,
+    fontSize: 15,
+    fontWeight: '700',
+    color: c.tint,
   },
   emptyState: {
     marginTop: 48,
@@ -662,6 +855,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 13,
     color: c.subtitle,
+  },
+  joinButton: {
+    marginTop: 22,
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: c.tint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: c.onPrimary,
   },
   leaveButton: {
     marginTop: 22,
