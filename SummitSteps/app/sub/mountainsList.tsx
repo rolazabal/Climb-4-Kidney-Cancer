@@ -1,29 +1,9 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { THEME_COLORS } from '@/constants/api';
+import { useEffect, useState } from 'react';
+import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Mountain } from '../(tabs)/mountains';
 
-const theme = {
-  primary: 'rgb(51, 51, 51)',
-  secondary: 'rgb(102, 102, 101)',
-  accent: 'rgb(205, 88, 56)',
-  accentDark: 'rgb(185, 68, 36)',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-};
-
-type Mountain = {
-  uuid: string;
-  name: string;
-  location?: string;
-  height?: number;
-  description?: string;
-  image_presigned_url?: string | null;
-};
-
-function Mountains() {
-  const mountains_url = 'http://10.0.2.2:8002';
-
+function MountainsList({view}: {view: Function}) {
   const mountainsClimbed: Mountain[] = [];
   const summits = mountainsClimbed.length;
 
@@ -40,20 +20,20 @@ function Mountains() {
 
   async function getMountains() {
     try {
-      const res = await fetch(`${mountains_url}/mountains`, {
+      let res = await fetch('https://mountains-service-production.up.railway.app/mountains', {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' }
       });
-
       if (res.status !== 200) {
         console.log('Mountains list failed:', res.status);
         return;
       }
+      let data = await res.json();
+	    setMountains(data);
 
-      const data = await res.json();
-
+      /*
       const detailPromises = data.map((m: any) =>
-        fetch(`${mountains_url}/mountains/${m.uuid}`, {
+        fetch(`${MOUNTAINS_URL}/mountains/${m.uuid}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         }).then(async (r) => {
@@ -67,7 +47,7 @@ function Mountains() {
       const details = await Promise.all(detailPromises);
 
       const imagePromises = details.map((m: any) =>
-        fetch(`${mountains_url}/mountains/${m.uuid}/image-url`, {
+        fetch(`${MOUNTAINS_URL}/mountains/${m.uuid}/image-url`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
         })
@@ -85,61 +65,68 @@ function Mountains() {
 
       setPeakNumber(newMountains.length);
       setMountains(newMountains);
+      */
     } catch (error) {
       console.log('Failed to get mountains:', error);
     }
   }
 
+  /*
   useFocusEffect(
     useCallback(() => {
       getMountains();
     }, [])
   );
+  */
+
+  useEffect(() => {
+    getMountains();
+  }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1, marginHorizontal: 10 }}>
+    <View style={{ flex: 1, marginHorizontal: 10 }}>
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1, marginBottom: 20 }}>
-          <Text style={[styles.label, { color: theme.primary }]}>Mountains</Text>
+          <Text style={[styles.label, { color: THEME_COLORS.primary }]}>Mountains</Text>
           <Text style={styles.small}>Explore peaks and track your summits</Text>
         </View>
 
         <View style={{ flex: 2, marginVertical: 10, flexDirection: 'row' }}>
           <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.climbed)}>
-            <Text style={[styles.label, { color: theme.accent }]}>{summits}</Text>
+            <Text style={[styles.label, { color: THEME_COLORS.accent }]}>{summits}</Text>
             <Text style={styles.small}>Summits</Text>
           </TouchableOpacity>
 
           <View style={{ flex: 1 }} />
 
           <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.all)}>
-            <Text style={[styles.label, { color: theme.accent }]}>{peakNumber}</Text>
+            <Text style={[styles.label, { color: THEME_COLORS.accent }]}>{peakNumber}</Text>
             <Text style={styles.small}>Total peaks</Text>
           </TouchableOpacity>
         </View>
 
         <View style={{ flex: 1, marginBottom: 10, flexDirection: 'row' }}>
           <TouchableOpacity
-            style={[styles.tab, tab === Tabs.all && { backgroundColor: theme.accent }]}
+            style={[styles.tab, tab === Tabs.all && { backgroundColor: THEME_COLORS.accent }]}
             onPress={() => setTab(Tabs.all)}
           >
-            <Text style={[styles.small, tab === Tabs.all && { color: theme.white }]}>All</Text>
+            <Text style={[styles.small, tab === Tabs.all && { color: THEME_COLORS.white }]}>All</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tab, tab === Tabs.climbed && { backgroundColor: theme.accent }]}
+            style={[styles.tab, tab === Tabs.climbed && { backgroundColor: THEME_COLORS.accent }]}
             onPress={() => setTab(Tabs.climbed)}
           >
-            <Text style={[styles.small, tab === Tabs.climbed && { color: theme.white }]}>
+            <Text style={[styles.small, tab === Tabs.climbed && { color: THEME_COLORS.white }]}>
               Climbed
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tab, tab === Tabs.toClimb && { backgroundColor: theme.accent }]}
+            style={[styles.tab, tab === Tabs.toClimb && { backgroundColor: THEME_COLORS.accent }]}
             onPress={() => setTab(Tabs.toClimb)}
           >
-            <Text style={[styles.small, tab === Tabs.toClimb && { color: theme.white }]}>
+            <Text style={[styles.small, tab === Tabs.toClimb && { color: THEME_COLORS.white }]}>
               To Climb
             </Text>
           </TouchableOpacity>
@@ -147,17 +134,17 @@ function Mountains() {
       </View>
 
       <View style={{ flex: 2 }}>
-        {tab === Tabs.all && <MountainList arr={mountains} />}
-        {tab === Tabs.climbed && <MountainList arr={mountainsClimbed} />}
-        {tab === Tabs.toClimb && <MountainList arr={mountains} />}
+        {tab === Tabs.all && <MountainList arr={mountains} view={(id: string) => {view(id)}} />}
+        {tab === Tabs.climbed && <MountainList arr={mountainsClimbed} view={(id: string) => {view(id)}} />}
+        {tab === Tabs.toClimb && <MountainList arr={mountains} view={(id: string) => {view(id)}} />}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
-function MountainList({ arr }: { arr: Mountain[] }) {
+function MountainList({ arr, view }: { arr: Mountain[], view: Function }) {
   const Item = ({ mountain }: { mountain: Mountain }) => (
-    <TouchableOpacity style={styles.item}>
+    <TouchableOpacity style={styles.item} onPress={() => {view(mountain.uuid)}}>
       {mountain.image_presigned_url ? (
         <Image
           source={{ uri: mountain.image_presigned_url }}
@@ -175,19 +162,19 @@ function MountainList({ arr }: { arr: Mountain[] }) {
             },
           ]}
         >
-          <Text style={{ color: theme.secondary }}>No Image</Text>
+          <Text style={{ color: THEME_COLORS.secondary }}>No Image</Text>
         </View>
       )}
 
-      <View style={{ padding: 15, backgroundColor: theme.primary }}>
-        <Text style={{ fontSize: 24, color: theme.white }}>{mountain.name}</Text>
+      <View style={{ padding: 15, backgroundColor: THEME_COLORS.primary }}>
+        <Text style={{ fontSize: 24, color: THEME_COLORS.white }}>{mountain.name}</Text>
       </View>
 
       <View style={{ padding: 15 }}>
-        <Text style={{ fontSize: 18, color: theme.secondary }}>
+        <Text style={{ fontSize: 18, color: THEME_COLORS.secondary }}>
           {mountain.location ?? 'Unknown location'}
         </Text>
-        <Text style={{ fontSize: 18, color: theme.secondary }}>
+        <Text style={{ fontSize: 18, color: THEME_COLORS.secondary }}>
           {mountain.height ?? 0} ft
         </Text>
       </View>
@@ -217,13 +204,13 @@ const styles = StyleSheet.create({
   },
   small: {
     textAlign: 'center',
-    color: theme.secondary,
+    color: THEME_COLORS.secondary,
     fontSize: 20,
   },
   info: {
     flex: 20,
     padding: 10,
-    backgroundColor: theme.white,
+    backgroundColor: THEME_COLORS.white,
     borderRadius: 10,
   },
   tab: {
@@ -233,7 +220,7 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    backgroundColor: theme.white,
+    backgroundColor: THEME_COLORS.white,
     marginBottom: 10,
     borderRadius: 10,
     overflow: 'hidden',
@@ -244,4 +231,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Mountains;
+export default MountainsList

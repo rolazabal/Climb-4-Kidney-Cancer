@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "App",
-    "slug": "App",
+    "name": "SummitSteps",
+    "slug": "SummitSteps",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "app",
+    "scheme": "summitsteps",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.App"
+      "bundleIdentifier": "com.anonymous.SummitSteps"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +21,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.app"
+      "package": "com.anonymous.SummitSteps"
     },
     "web": {
       "output": "static",
@@ -41,15 +41,15 @@
           }
         }
       ],
+      "expo-background-task",
+      "expo-sqlite",
       [
-        "expo-sqlite",
+        "expo-build-properties",
         {
-          "enableFTS": true,
-          "useSQLCipher": true,
-          "ios": {
-            "customBuildFlags": [
-              "-DSQLITE_ENABLE_DBSTAT_VTAB=1 -DSQLITE_ENABLE_SNAPSHOT=1"
-            ]
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "minSdkVersion": 26
           }
         }
       ]

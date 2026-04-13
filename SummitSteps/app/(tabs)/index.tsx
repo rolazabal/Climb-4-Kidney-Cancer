@@ -1,9 +1,9 @@
+import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
+import { Colors } from "@/constants/theme";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
-import { Colors } from "@/constants/theme";
-import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
 
 const c = Colors.light;
 
