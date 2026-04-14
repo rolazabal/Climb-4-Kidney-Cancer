@@ -34,15 +34,6 @@ import {
   validateBio,
 } from '@/lib/validation';
 import { Colors } from '@/constants/theme';
-
-const theme = {
-  primary: 'rgb(51, 51, 51)',
-  secondary: 'rgb(224, 222, 222)',
-  accent: 'rgb(205, 88, 56)',
-  white: '#FFFFFF',
-  background: 'rgb(128, 128, 128)',
-  subtle: 'rgb(102, 102, 101)',
-};
 const c = Colors.light;
 
 //bio character limit
@@ -220,7 +211,7 @@ export default function SettingsScreen() {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={theme.accent} />
+          <ActivityIndicator size="large" color={c.tint} />
         </View>
       </SafeAreaView>
     );
@@ -246,7 +237,7 @@ export default function SettingsScreen() {
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <User size={18} color={theme.primary} />
+              <User size={18} color={c.heading} />
               <AppText style={styles.cardTitle}>Account Information</AppText>
             </View>
             <EditableField
@@ -270,7 +261,7 @@ export default function SettingsScreen() {
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <SettingsIcon size={18} color={theme.primary} />
+              <SettingsIcon size={18} color={c.heading} />
               <AppText style={styles.cardTitle}>Profile Settings</AppText>
             </View>
 
@@ -365,9 +356,9 @@ export default function SettingsScreen() {
               disabled={!canSave || isSaving}
             >
               {isSaving ? (
-                <ActivityIndicator size="small" color={theme.white} />
+                <ActivityIndicator size="small" color={c.onPrimary} />
               ) : (
-                <Save size={18} color={theme.white} />
+                <Save size={18} color={c.onPrimary} />
               )}
               <AppText style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Changes'}</AppText>
             </TouchableOpacity>
@@ -388,7 +379,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: c.background,
   },
   keyboardView: {
     flex: 1,
@@ -397,8 +388,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 32,
   },
   centered: {
     flex: 1,
@@ -415,16 +407,19 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   subtitle: {
-    fontSize: 16,
-    color: theme.subtle,
+    fontSize: 18,
+    color: c.subtitle,
   },
   card: {
-    backgroundColor: theme.white,
-    borderRadius: 12,
+    backgroundColor: c.surface,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: theme.secondary,
+    shadowColor: c.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -433,24 +428,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.primary,
+    fontSize: 20,
+    fontWeight: '700',
+    color: c.heading,
   },
   fieldLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: theme.primary,
+    fontWeight: '700',
+    color: c.heading,
     marginBottom: 6,
   },
   readOnlyValue: {
     fontSize: 16,
-    color: theme.primary,
+    color: c.text,
     marginBottom: 12,
   },
   roleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.accent,
+    backgroundColor: c.tint,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -458,12 +453,12 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 12,
     fontWeight: '600',
-    color: theme.white,
+    color: c.onPrimary,
   },
   sectionLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: theme.primary,
+    fontWeight: '700',
+    color: c.heading,
     marginBottom: 8,
     marginTop: 4,
   },
@@ -482,39 +477,40 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: theme.secondary,
+    backgroundColor: c.surfaceMuted,
   },
   chooseButton: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: theme.secondary,
-    borderRadius: 8,
+    paddingVertical: 10,
+    backgroundColor: c.surfaceMuted,
+    borderRadius: 10,
   },
   chooseButtonText: {
     fontSize: 14,
-    color: theme.primary,
-    fontWeight: '500',
+    color: c.heading,
+    fontWeight: '700',
   },
   fileHint: {
     fontSize: 14,
-    color: theme.subtle,
+    color: c.subtitle,
+    flex: 1,
   },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: theme.accent,
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: c.tint,
+    minHeight: 56,
+    borderRadius: 14,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: theme.white,
+    fontWeight: '700',
+    color: c.onPrimary,
   },
   logoutLink: {
     flexDirection: 'row',

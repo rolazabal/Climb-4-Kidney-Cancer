@@ -1,57 +1,57 @@
-import {StyleSheet, Text, View, FlatList, TouchableOpacity} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from 'react';
-import { TextAlignCenter } from 'lucide-react-native';
-//import { MOUNTAINS_URL, PROGRESS_URL } from '@/constants/api';
+import { Colors } from '@/constants/theme';
 
-const theme = {
-    primary: 'rgb(51, 51, 51)',
-    secondary: 'rgb(102, 102, 101)',
-    accent: 'rgb(205, 88, 56)',
-    accentDark: 'rgb(185, 68, 36)',
-    background: '#F9FAFB',
-    white: '#FFFFFF',
-};
+const c = Colors.light;
 
 function Progress() {
-
-    const [elevation, setElevation] = useState(0);
+    const [elevation] = useState(0);
 
     return (
-        <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
-            <View style={{flex: 2}}>
-                <Text style={styles.label}>
+        <SafeAreaView style={styles.screen} edges={["top"]}>
+            <View style={styles.content}>
+                <Text style={styles.pageTitle}>
                     Progress
                 </Text>
-                <Text style={styles.small}>
-                    Track your progress
+                <Text style={styles.pageSubtitle}>
+                    Track your progress and stay consistent.
                 </Text>
-            </View>
-            <View style={{flex: 8}}>
-                <View style={styles.card}>
-                    <View style={styles.card_head}>
-                        <Text style={styles.card_head_text}>
-                            Activity
-                        </Text>
+
+                <View style={styles.highlightsRow}>
+                    <View style={styles.highlightCard}>
+                        <Text style={styles.highlightValue}>{elevation}</Text>
+                        <Text style={styles.highlightLabel}>ft climbed today</Text>
                     </View>
-                    <View style={{flex: 3, padding: 50}}>
-                        <Text style={[styles.label, {color: theme.accent}]}>
+                    <View style={styles.highlightCard}>
+                        <Text style={styles.highlightValue}>0</Text>
+                        <Text style={styles.highlightLabel}>active goals</Text>
+                    </View>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>
+                            Activity
+                    </Text>
+                    <View style={styles.cardBody}>
+                        <Text style={styles.metricValue}>
                             {elevation}
                         </Text>
-                        <Text style={styles.small}>
+                        <Text style={styles.metricLabel}>
                             ft climbed today
                         </Text>
                     </View>
                 </View>
                 <View style={styles.card}>
-                    <View style={styles.card_head}>
-                        <Text style={styles.card_head_text}>
+                    <Text style={styles.cardTitle}>
                             Daily Quest
+                    </Text>
+                    <View style={styles.questPanel}>
+                        <Text style={styles.questHeadline}>
+                            Climb 500 ft today
                         </Text>
-                    </View>
-                    <View style={{flex: 3, padding: 50}}>
-                        <Text style={styles.small}>
-                            Some quest info
+                        <Text style={styles.questCopy}>
+                            Complete a short stair or hill session to keep your streak moving.
                         </Text>
                     </View>
                 </View>
@@ -61,39 +61,104 @@ function Progress() {
 }
 
 const styles = StyleSheet.create({
-    label: {
-        textAlign: 'center',
+    screen: {
+        flex: 1,
+        backgroundColor: c.background,
+    },
+    content: {
+        flex: 1,
+        padding: 16,
+        paddingBottom: 32,
+    },
+    pageTitle: {
         fontSize: 44,
+        fontWeight: '700',
+        color: c.heading,
+        marginBottom: 2,
     },
-    small: {
-        textAlign: 'center',
-        color: theme.secondary,
-        fontSize: 20,
+    pageSubtitle: {
+        fontSize: 18,
+        color: c.subtitle,
+        marginBottom: 16,
     },
-    info: {
-        flex: 20,
-        padding: 10,
-        backgroundColor: theme.white,
-        borderRadius: 10,
-
+    highlightsRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 16,
+    },
+    highlightCard: {
+        flex: 1,
+        backgroundColor: c.surface,
+        borderRadius: 14,
+        padding: 16,
+        shadowColor: c.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    highlightValue: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: c.tint,
+        marginBottom: 4,
+    },
+    highlightLabel: {
+        fontSize: 14,
+        color: c.subtitle,
     },
     card: {
-        flex: 1,
-        backgroundColor: theme.white,
-        marginBottom: 10,
-        borderRadius: 10,
+        backgroundColor: c.surface,
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 12,
+        shadowColor: c.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    card_head: {
-        flex: 1,
-        padding: 10,
-        backgroundColor: theme.primary,
-        borderTopStartRadius: 10,
-        borderTopEndRadius: 10,
+    cardTitle: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: c.heading,
+        marginBottom: 12,
     },
-    card_head_text: {
-        fontSize: 24,
-        color: theme.white,
-    }
+    cardBody: {
+        minHeight: 168,
+        borderRadius: 12,
+        backgroundColor: c.surfaceMuted,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+    },
+    metricValue: {
+        fontSize: 44,
+        fontWeight: '700',
+        color: c.tint,
+        marginBottom: 8,
+    },
+    metricLabel: {
+        fontSize: 18,
+        color: c.subtitle,
+        textAlign: 'center',
+    },
+    questPanel: {
+        borderRadius: 12,
+        backgroundColor: c.surfaceWarm,
+        padding: 20,
+    },
+    questHeadline: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: c.heading,
+        marginBottom: 8,
+    },
+    questCopy: {
+        fontSize: 15,
+        lineHeight: 22,
+        color: c.subtitle,
+    },
 });
 
 export default Progress;

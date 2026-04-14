@@ -148,9 +148,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   pageSubtitle: {
-    fontSize: 24,
+    fontSize: 18,
     color: c.subtitle,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   profileCard: {
     backgroundColor: c.surface,
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700",
     color: c.heading,
   },

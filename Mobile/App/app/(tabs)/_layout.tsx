@@ -4,7 +4,7 @@ import 'react-native-reanimated';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Play, Pause, RotateCcw, Flag, Mountain as MountainIcon, UserRoundSearch } from 'lucide-react-native';
@@ -16,24 +16,25 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-const theme = {
-  primary: 'rgb(51, 51, 51)',
-  secondary: 'rgb(102, 102, 101)',
-  accent: 'rgb(205, 88, 56)',
-  accentDark: 'rgb(185, 68, 36)',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-};
-
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const palette = Colors[colorScheme ?? 'light'];
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: palette.tint,
+        tabBarInactiveTintColor: palette.tabIconDefault,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: palette.surface,
+          borderTopColor: palette.border,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
       }}>
       <Tabs.Screen
         name="index"
@@ -46,35 +47,35 @@ export default function TabLayout() {
         name="progress"
         options={{
           title: 'Progress',
-          tabBarIcon: ({ color }) => <TrendingUp color={theme.secondary} size={24} />,
+          tabBarIcon: ({ color }) => <TrendingUp color={color} size={24} />,
         }}
         />
         <Tabs.Screen
         name="mountains"
         options={{
           title: 'Mountains',
-          tabBarIcon: ({ color }) => <Map color={theme.secondary} size={24} />,
+          tabBarIcon: ({ color }) => <Map color={color} size={24} />,
         }}
         />
         <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <User color={theme.secondary} size={24} />,
+          tabBarIcon: ({ color }) => <User color={color} size={24} />,
         }}
         />
         <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color }) => <Settings color={theme.secondary} size={24} />,
+          tabBarIcon: ({ color }) => <Settings color={color} size={24} />,
         }}
         />
       <Tabs.Screen
         name="group"
         options={{
           title: 'Groups',
-          tabBarIcon: ({ color }) => <UserRoundSearch color={theme.secondary} size={24} />,
+          tabBarIcon: ({ color }) => <UserRoundSearch color={color} size={24} />,
         }}
       />
       </Tabs>
@@ -86,7 +87,7 @@ export function AppText(props: TextProps) {
   return (
     <Text
       {...props}
-      style={[{ fontFamily: 'serif'}, props.style]}
+      style={[{ fontFamily: Fonts.sans }, props.style]}
     />
   );
 }
