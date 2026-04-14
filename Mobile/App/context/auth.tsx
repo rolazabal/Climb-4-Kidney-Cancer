@@ -1,8 +1,9 @@
 import * as SecureStore from "expo-secure-store";
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { AUTH_URL } from "@/constants/api";
 
-const ACCESS_TOKEN_KEY = "auth_access_token"
-const REFRESH_TOKEN_KEY = "auth_refresh_token"
+const ACCESS_TOKEN_KEY = "auth_access_token";
+const REFRESH_TOKEN_KEY = "auth_refresh_token";
 
 type Session = {
   userId: string;
@@ -10,7 +11,7 @@ type Session = {
   username: string;
   accessToken: string;
   refreshToken: string;
-}
+};
 
 type AuthContextValue = {
   isLoggedIn: boolean;
@@ -41,13 +42,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (accessToken && refreshToken) {
           // Decode JWT payload to restore session w/o network call
           const payload = JSON.parse(atob(accessToken.split(".")[1]));
-          setSession({
-            userId: payload.sub,
-            email: payload.email,
-            username: "",
-            accessToken,
-            refreshToken,
-          });
+
+          // Check if access token is expired
+          const isExpired = payload.exp * 1000 < Date.now();
+
+          if (isExpired) {
+            // Try to refresh proactively before the user hits any screen
+            const res = await fetch(`${AUTH_URL}/refresh`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ refresh_token: refreshToken }),
+            });
+
+            if (res.ok) {
+              const { access_token, refresh_token } = await res.json();
+              await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, access_token);
+              await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refresh_token);
+              const newPayload = JSON.parse(atob(access_token.split(".")[1]));
+              setSession({
+                userId: newPayload.sub,
+                email: newPayload.email,
+                username: "",
+                accessToken: access_token,
+                refreshToken: refresh_token,
+              });
+            }
+            // If refresh fails, fall through — session stays null, user goes to login
+          } else {
+            setSession({
+              userId: payload.sub,
+              email: payload.email,
+              username: "",
+              accessToken,
+              refreshToken, // refreshed when the profile screen loads
+            });
+          }
         }
       } catch (e) {
         console.warn("Failed to hydrate auth tokens:", e);

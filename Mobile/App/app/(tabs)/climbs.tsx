@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+import { apiFetch } from "@/utils/apiFetch";
 
 const c = Colors.light;
 
@@ -49,7 +50,7 @@ const initialInProgressMountains: InProgressMountain[] = [
 ];
 
 function Climbs() {
-  const { userId } = useAuth();
+  const { userId, logOut } = useAuth();
   const [isSelectingMountain, setIsSelectingMountain] = useState(false);
   const [availableMountains, setAvailableMountains] = useState<Mountain[]>([]);
   const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
@@ -66,7 +67,13 @@ function Climbs() {
   );
 
   async function getUserClimbs(userId: string): Promise<ProgressClimbRecord[]> {
-    const response = await fetch(`${PROGRESS_URL}/progress/user/${userId}`);
+    const response = await apiFetch(`${PROGRESS_URL}/progress/user/${userId}`);
+
+    if (response.status === 401) {
+      await logOut();
+      router.replace("/login");
+      return [];
+    }
 
     if (response.status === 404) {
       return [];
@@ -80,10 +87,7 @@ function Climbs() {
   }
 
   async function getMountainDetail(mountainId: string): Promise<MountainDetail | null> {
-    const response = await fetch(`${MOUNTAINS_URL}/mountains/${mountainId}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await apiFetch(`${MOUNTAINS_URL}/mountains/${mountainId}`);
 
     if (response.status === 404) {
       return null;
