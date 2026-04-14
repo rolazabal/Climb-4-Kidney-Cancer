@@ -436,6 +436,7 @@ async def request_verification(req: EmailRequest):
     return {"message": "Verification email sent"}
 
 
+# Verify the code the user received via email.
 @app.post("/auth/verify-email")
 async def verify_email(req: VerifyEmailRequest):
     async with app.state.pool.acquire() as conn:
@@ -493,6 +494,7 @@ async def verify_email(req: VerifyEmailRequest):
 
     return {"message": "Email verified successfully"}
 
+# Admin-use only: provide verification to user with no code required.
 @router.patch("/verify-email")
 async def verify_user_email(req: EmailRequest):
     async with app.state.pool.acquire() as conn:
