@@ -6,6 +6,7 @@ import { useCallback, useState } from "react";
 import { Colors } from "@/constants/theme";
 import { USERS_URL } from "@/constants/api";
 import { useAuth } from "@/context/auth";
+import { apiFetch } from "@/utils/apiFetch";
 
 type StatItem = {
   id: string;
@@ -49,7 +50,13 @@ function ProfilePage() {
     }
 
     try {
-      const res = await fetch(`${USERS_URL}/by-email/${encodeURIComponent(email)}`);
+      const res = await apiFetch(`${USERS_URL}/by-email/${encodeURIComponent(email)}`);
+
+      if (res.status === 401) {
+        await logOut();
+        router.replace("/login");
+        return;
+      }
 
       if (!res.ok) {
         setProfile({
