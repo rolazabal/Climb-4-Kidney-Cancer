@@ -106,6 +106,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
 
       logOut: async () => {
+        // Revoke the session on the server first
+        try {
+          const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+          if (refreshToken) {
+            await fetch(`${AUTH_URL}/logout`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ refresh_token: refreshToken }),
+          });
+        }
+        } catch (e) {
+          // Non-fatal, clear locally even if server call fails
+          console.warn("Failed to revoke session on server:", e);
+        }
+
+        // Clear tokens from device regardless
         await Promise.all([
           SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
           SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
