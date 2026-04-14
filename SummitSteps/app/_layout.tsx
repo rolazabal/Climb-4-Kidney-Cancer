@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as TaskManager from 'expo-task-manager';
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import { initialize, readRecords, requestPermission } from 'react-native-health-connect';
 import 'react-native-reanimated';
 
 export const unstable_settings = {
@@ -15,6 +16,20 @@ export const unstable_settings = {
 
 function RootLayout() {
   const colorScheme = useColorScheme();
+
+  // permissions
+  async function requestPerms() {
+    await requestPermission([
+      {
+        accessType: 'read',
+        recordType: 'BackgroundAccessPermission'
+      },
+      {
+        accessType: 'read',
+        recordType: 'ElevationGained'
+      }
+    ]);
+  }
 
   // define background task
   const DATA_TASK_ID = 'data_task';
@@ -30,8 +45,16 @@ function RootLayout() {
       let db = await getConnection();
       let date = new Date();
       let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $climb, $start)');
+      const { records } = await readRecords('ElevationGained', {
+        timeRangeFilter: {
+          operator: 'between',
+          startTime: '2023-01-09T12:00:00.405Z',
+          endTime: '2023-01-09T23:53:15.405Z'
+        }
+      });
+      console.log(records);
       try {
-        await statement.executeAsync({$time: date.getTime(), $climb: 0, $start: false});
+        await statement.executeAsync({$time: date.getTime(), $climb: "0", $start: false});
       } finally {
         await statement.finalizeAsync();
       }
@@ -60,22 +83,23 @@ function RootLayout() {
   }
 
   // app database setup
-  async function getConnection() {
-      let db = await SQLite.openDatabaseAsync("app", {useNewConnection: true});
-      return db;
-  }
-
   async function initializeDatabase() {
     let db = await getConnection();
     await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS times (time INTEGER, climb_id INTEGER, is_start BOOLEAN);
-      CREATE TABLE IF NOT EXISTS climbs (id INTEGER, mountain_id INTEGER, elevation INTEGER, is_active BOOLEAN);
-      CREATE TABLE IF NOT EXISTS mountains (id INTEGER, summited BOOLEAN);
+      CREATE TABLE IF NOT EXISTS times (time INTEGER, climb_id TEXT, is_start BOOLEAN);
+      CREATE TABLE IF NOT EXISTS climbs (id TEXT, mountain_id TEXT, elevation INTEGER, is_active BOOLEAN);
+      DROP TABLE IF EXISTS mountains;
+      CREATE TABLE mountains (id TEXT, name TEXT, location TEXT, height INTEGER, summited BOOLEAN);
+      CREATE TABLE IF NOT EXISTS notifications (id INTEGER, message TEXT, date INTEGER);
+      DROP TABLE IF EXISTS sync;
+      CREATE TABLE sync (mountains BOOLEAN, climbs BOOLEAN);
     `);
-    let date = new Date();
     let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $climb, $start)');
     try {
-      await statement.executeAsync({$time: date.getTime(), $climb: 0, $start: true});
+      let date = new Date();
+      await statement.executeAsync({$time: date.getTime(), $climb: "0", $start: true});
+      statement = await db.prepareAsync('INSERT INTO sync VALUES ($1, $2)');
+      await statement.executeAsync({$1: false, $2: false});
     } finally {
       await statement.finalizeAsync();
     }
@@ -85,11 +109,14 @@ function RootLayout() {
 
   useEffect(() => {
     const initTask = async () => {
+      await initializeDatabase();
+      initialize();
+      await requestPerms();
       await registerBackgroundTaskAsync();
       await updateAsync();
     };
     console.log("Root Loaded!");
-    initializeDatabase();
+    // register background task
     initTask();
     // create listener for change in appState, capture new state in nextAppState
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -119,6 +146,11 @@ function RootLayout() {
       <StatusBar style="auto" />
     </ThemeProvider>
   );
+}
+
+export async function getConnection() {
+    let db = await SQLite.openDatabaseAsync("app", {useNewConnection: true});
+    return db;
 }
 
 export default RootLayout;

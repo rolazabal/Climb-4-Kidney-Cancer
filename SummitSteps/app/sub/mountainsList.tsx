@@ -2,6 +2,7 @@ import { MOUNTAINS_URL, THEME_COLORS } from '@/constants/api';
 import { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Mountain } from '../(tabs)/mountains';
+import { getConnection } from '../_layout';
 
 function MountainsList({view}: {view: Function}) {
   const mountainsClimbed: Mountain[] = [];
@@ -19,19 +20,23 @@ function MountainsList({view}: {view: Function}) {
   const [tab, setTab] = useState(Tabs.all);
 
   async function getMountains() {
+    // check sync
+    let db = await getConnection();
+    let row = await db.getFirstAsync('SELECT mountains FROM sync');
+    console.log(row);
+
     try {
+      // request mountain list
       let res = await fetch(MOUNTAINS_URL, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
-
       if (res.status !== 200) {
         console.log('Mountains list failed:', res.status);
         return;
       }
       
       let mountains = await res.json();
-
       let imagePromises = mountains.map((mountain: Mountain) => fetch(MOUNTAINS_URL + "/" + mountain.uuid + "/image-url", {
         method: 'GET',
         headers: {'Content-Type': 'application/json'},
@@ -42,7 +47,6 @@ function MountainsList({view}: {view: Function}) {
       );
 
       let urls = await Promise.all(imagePromises);
-
       mountains = mountains.map((mountain: Mountain, index: number) => ({
         ...mountain,
         image_presigned_url: urls[index],
@@ -50,6 +54,27 @@ function MountainsList({view}: {view: Function}) {
 
       setPeakNumber(mountains.length);
       setMountains(mountains);
+
+      // sync
+      let statement = await db.prepareAsync('INSERT INTO mountains VALUES ($id, $name, $location, $height, $summited)');
+      try {
+        for (let x in mountains) {
+          const key = x as keyof Mountain;
+          let mountain = mountains[key];
+          await statement.executeAsync({
+            $id: mountain.uuid,
+            $name: mountain.name,
+            $location: mountain.location,
+            $height: mountain.height,
+            $summited: false
+          });
+        }
+      } finally {
+        await statement.finalizeAsync();
+      }
+      statement = await db.prepareAsync('UPDATE sync SET mountains = true WHERE mountains = false');
+      await statement.executeAsync();
+      await statement.finalizeAsync();
     } catch (error) {
       console.log('Failed to get mountains:', error);
     }

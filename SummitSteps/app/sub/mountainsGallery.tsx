@@ -41,8 +41,8 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                 <View>
                     <FlatList
                         horizontal
-                        data={mountain.image_presigned_url}
-                        renderItem={({item}) => <Image style={styles.img} source={{uri: item}} />}
+                        data={[1]}
+                        renderItem={({item}) => <Image style={styles.img} source={{uri: "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic.vecteezy.com%2Fsystem%2Fresources%2Fpreviews%2F012%2F168%2F187%2Flarge_2x%2Fbeautiful-sunset-on-the-beach-with-palm-tree-for-travel-and-vacation-free-photo.JPG&f=1&nofb=1&ipt=17a644e042b90a73a2d8aa295d51bed71101dc75cb7c23525ba5c87435cf3371"}} />}
                     />
                 </View>
                 <View>

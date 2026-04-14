@@ -21,7 +21,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.SummitSteps"
+      "package": "com.anonymous.SummitSteps",
+      "permissions": [
+        "android.permission.health.READ_ELEVATION_GAINED",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+      ]
     },
     "web": {
       "output": "static",
@@ -52,7 +56,8 @@
             "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      "expo-health-connect"
     ],
     "experiments": {
       "typedRoutes": true,
