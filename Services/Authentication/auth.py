@@ -146,7 +146,7 @@ app = FastAPI(lifespan=lifespan)
 async def get_user_by_email(email: str):
     async with httpx.AsyncClient(timeout=5.0) as client:
         try:
-            response = await client.get(f"{USERS_SERVICE_URL}/users/by-email/{email}")
+            response = await client.get(f"{USERS_SERVICE_URL}/by-email/{email}")
         except httpx.TimeoutException:
             raise HTTPException(status_code=504, detail="Users service timed out")
         except Exception:
@@ -161,7 +161,7 @@ async def get_user_by_email(email: str):
             raise HTTPException(status_code=403, detail="Account suspended")
 
         return user
-    
+
     
 async def revoke_session(redis_client, sid: str):
     session_key = f"auth:session:{sid}"
@@ -222,7 +222,13 @@ async def request_login(payload: RequestLogin):
     )
     
 
-    send_otp_email(payload.email, code)
+    try:
+        send_otp_email(payload.email, code)
+    except Exception as e:
+        # Roll back rate-limit key so user can retry immediately
+        await redis_client.delete(rate_limit_key)
+        await redis_client.delete(f"auth:otp:{payload.email}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
     return {
         "message": "OTP sent"
@@ -265,6 +271,13 @@ async def verify_login(payload: VerifyLogin):
     await redis_client.delete(attempts_key)
 
     user = await get_user_by_email(payload.email)
+
+    # Mark email as verified
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        await client.patch(
+            f"{USERS_SERVICE_URL}/verify-email",
+            json={"email": payload.email}
+        )
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

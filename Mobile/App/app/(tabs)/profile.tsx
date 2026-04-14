@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useFocusEffect } from "expo-router";
+import { router, Stack, useFocusEffect } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useState } from "react";
@@ -37,6 +37,11 @@ function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile>(fallbackProfile);
   const { email, username, userId, logOut } = useAuth();
 
+  async function handleLogOut() {
+    await logOut();
+    router.replace("/login");
+  }
+
   const loadUserProfile = useCallback(async () => {
     if (!email) {
       setProfile(fallbackProfile);
@@ -44,7 +49,7 @@ function ProfilePage() {
     }
 
     try {
-      const res = await fetch(`${USERS_URL}/users/by-email/${encodeURIComponent(email)}`);
+      const res = await fetch(`${USERS_URL}/by-email/${encodeURIComponent(email)}`);
 
       if (!res.ok) {
         setProfile({
@@ -133,7 +138,7 @@ function ProfilePage() {
           <View style={styles.accountCard}>
             <Text style={styles.accountTitle}>Account</Text>
             <Text style={styles.accountMeta}>Current user ID: {userId ?? "None"}</Text>
-            <Pressable onPress={logOut} style={styles.logoutButton}>
+            <Pressable onPress={handleLogOut} style={styles.logoutButton}>
               <Text style={styles.logoutButtonText}>Log Out</Text>
             </Pressable>
           </View>

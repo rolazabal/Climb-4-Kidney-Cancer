@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { AUTH_URL, USERS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
@@ -138,6 +139,8 @@ export default function LoginScreen() {
         accessToken: access_token,
         refreshToken: refresh_token,
       });
+
+      router.replace("/(tabs)/climbs");
     } catch (err) {
       console.error(err);
       setErrorMessage("Could not verify code. Please try again.");

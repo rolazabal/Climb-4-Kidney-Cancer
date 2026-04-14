@@ -270,15 +270,18 @@ router = APIRouter()
 @router.post("/")
 async def add_user(users: User):
     async with app.state.pool.acquire() as conn:
-        new_id = await create_user(
-            conn,
-            users.email,
-            users.username,
-            users.dob,
-            users.bio,
-            users.profile_photo_media_id,
-            role="user"  # always force "user" — role cannot be set by the client
-        )
+        try:
+            new_id = await create_user(
+                conn,
+                users.email,
+                users.username,
+                users.dob,
+                users.bio,
+                users.profile_photo_media_id,
+                role="user"  # always force "user" — role cannot be set by the client
+            )
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(status_code=409, detail="Email or username already taken")
 
     return {"id": new_id}
 
@@ -396,7 +399,7 @@ async def get_user_by_email(email: str):
 
         return dict(user)
 
-app.include_router(router, prefix="/users", tags=["users"])
+app.include_router(router, tags=["users"])
 
 
 @app.get("/health")
@@ -433,6 +436,7 @@ async def request_verification(req: EmailRequest):
     return {"message": "Verification email sent"}
 
 
+# Verify the code the user received via email.
 @app.post("/auth/verify-email")
 async def verify_email(req: VerifyEmailRequest):
     async with app.state.pool.acquire() as conn:
@@ -489,6 +493,18 @@ async def verify_email(req: VerifyEmailRequest):
         )
 
     return {"message": "Email verified successfully"}
+
+# Admin-use only: provide verification to user with no code required.
+@router.patch("/verify-email")
+async def verify_user_email(req: EmailRequest):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET email_verified = TRUE WHERE email = $1",
+            req.email
+        )
+    if result.endswith("0"):
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "Email verified"}
 
 @router.patch("/{user_id}/ban")
 async def ban_user(user_id: uuid.UUID, current_user: dict = Depends(require_admin)):

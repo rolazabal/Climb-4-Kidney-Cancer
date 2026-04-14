@@ -66,10 +66,12 @@ def presigned_get_url(key: str, expires_seconds: int = 3600) -> str:
     )
 
 def to_mountain_key(filename_or_key: str) -> str:
-    # If DB already contains a full key, keep it
-    if filename_or_key.startswith(MOUNTAIN_PREFIX):
-        return filename_or_key
-    return MOUNTAIN_PREFIX + filename_or_key
+    # Extract just the filename regardless of whether DB stores full path or just filename
+    # e.g. "MountainsImages/mt_bierstadt/mt_bierstadt.png" -> "mt_bierstadt.png"
+    # e.g. "mt_bierstadt.png" -> "mt_bierstadt.png"
+    filename = filename_or_key.split("/")[-1]
+    stem = os.path.splitext(filename)[0]  # "mt_bierstadt"
+    return f"{MOUNTAIN_PREFIX}{stem}/{filename}"  # "MountainsImages/mt_bierstadt/mt_bierstadt.png"
 
 async def create_mountain(conn, name, height, location, description=None, image_url=None):
     row = await conn.fetchrow('''
@@ -156,6 +158,13 @@ async def lifespan(app: FastAPI):
                 image_url text
         );
     """)
+        # Migration: strip path prefix from image_url, keep only filename
+        # e.g. "MountainsImages/mt_bierstadt/mt_bierstadt.png" -> "mt_bierstadt.png"
+        await conn.execute("""
+            UPDATE mountains
+            SET image_url = regexp_replace(image_url, '^.+/', '')
+            WHERE image_url LIKE '%/%'
+        """)
 
     yield
 
@@ -241,8 +250,8 @@ async def get_mountain_image_url(mountain_id: str):
     if not row or not row["image_url"]:
         raise HTTPException(404, "Image not found")
 
-    # DB stores filename like "EverestPhoto.jpg"
-    key = to_mountain_key(row["image_url"])  # -> "MountainsImages/EverestPhoto.jpg"
+    # DB stores filename like "mt_bierstadt.png"
+    key = to_mountain_key(row["image_url"])  # -> "MountainsImages/mt_bierstadt/mt_bierstadt.png"
     return {"url": presigned_get_url(key)}
 
 @app.get("/health")
