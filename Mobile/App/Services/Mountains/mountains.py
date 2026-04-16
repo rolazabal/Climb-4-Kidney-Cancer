@@ -1,27 +1,46 @@
 # IMPORTS
 import boto3
 import os
-
-S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
-S3_REGION = os.getenv("S3_REGION", "us-east-2")
-MOUNTAINS_API_URL = "https://climb-4-kidney-cancer-production-fde3.up.railway.app/mountains/mountains"
-
-
-s3 = boto3.client("s3", region_name=S3_REGION)
-
-MOUNTAIN_PREFIX = "MountainsImages/"
-
-# type "fastapi dev mountains.py" in console to run
-import os
 import asyncpg
 import asyncio
 import uuid
 import httpx
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
+
+
+def load_local_env() -> None:
+    env_paths = [
+        Path(__file__).resolve().parents[4] / ".env",
+        Path(__file__).resolve().parents[2] / ".env",
+    ]
+
+    for env_path in env_paths:
+        if not env_path.exists():
+            continue
+
+        for raw_line in env_path.read_text().splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip())
+
+
+load_local_env()
+
+S3_BUCKET = os.getenv("S3_BUCKET") or os.getenv("AWS_S3_BUCKET_NAME") or "summitstepimages"
+S3_REGION = os.getenv("S3_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-2"
+DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("MOUNTAINS_DATABASE_URL")
+
+s3 = boto3.client("s3", region_name=S3_REGION)
+
+MOUNTAIN_PREFIX = "MountainsImages/"
 
 
 # Security
@@ -183,12 +202,15 @@ async def list_mountains(conn):
 # LIFESPAN 
 # --------------
 
-DBurl = os.getenv("DATABASE_URL")
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "Missing DATABASE_URL or MOUNTAINS_DATABASE_URL for the mountains service."
+        )
+
     # startup
-    app.state.pool = await asyncpg.create_pool(DBurl)
+    app.state.pool = await asyncpg.create_pool(DATABASE_URL)
 
     async with app.state.pool.acquire() as conn:
         await conn.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')

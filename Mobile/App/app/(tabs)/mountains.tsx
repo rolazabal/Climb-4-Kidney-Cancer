@@ -5,6 +5,12 @@ import { useFocusEffect } from 'expo-router';
 import { Colors } from '@/constants/theme';
 
 const c = Colors.light;
+const DEFAULT_MOUNTAINS_URL =
+  'https://climb-4-kidney-cancer-production-fde3.up.railway.app/mountains';
+const configuredMountainsUrl = process.env.EXPO_PUBLIC_MOUNTAINS_API_URL?.trim();
+const mountainsBaseUrls = configuredMountainsUrl
+  ? [configuredMountainsUrl, DEFAULT_MOUNTAINS_URL]
+  : [DEFAULT_MOUNTAINS_URL];
 
 type Mountain = {
   uuid: string;
@@ -16,8 +22,6 @@ type Mountain = {
 };
 
 function Mountains() {
-  const mountains_url = 'http://10.0.2.2:8002';
-
   const mountainsClimbed: Mountain[] = [];
   const summits = mountainsClimbed.length;
 
@@ -32,40 +36,36 @@ function Mountains() {
 
   const [tab, setTab] = useState(Tabs.all);
 
+  async function fetchJsonWithFallback(path: string) {
+    let lastError: unknown = null;
+
+    for (const baseUrl of mountainsBaseUrls) {
+      try {
+        const res = await fetch(`${baseUrl}${path}`);
+        if (!res.ok) {
+          throw new Error(`Request failed for ${baseUrl}${path}: ${res.status}`);
+        }
+        return await res.json();
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error(`Failed to fetch ${path}`);
+  }
+
   async function getMountains() {
     try {
-      const res = await fetch(`${mountains_url}/mountains`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (res.status !== 200) {
-        console.log('Mountains list failed:', res.status);
-        return;
-      }
-
-      const data = await res.json();
+      const data = await fetchJsonWithFallback('/mountains');
 
       const detailPromises = data.map((m: any) =>
-        fetch(`${mountains_url}/mountains/${m.uuid}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }).then(async (r) => {
-          if (!r.ok) {
-            throw new Error(`Failed to fetch detail for ${m.uuid}: ${r.status}`);
-          }
-          return r.json();
-        })
+        fetchJsonWithFallback(`/mountains/${m.uuid}`)
       );
 
       const details = await Promise.all(detailPromises);
 
       const imagePromises = details.map((m: any) =>
-        fetch(`${mountains_url}/mountains/${m.uuid}/image-url`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        })
-          .then((r) => (r.status === 200 ? r.json() : null))
+        fetchJsonWithFallback(`/mountains/${m.uuid}/image-url`)
           .then((j) => (j?.url ? j.url : null))
           .catch(() => null)
       );
@@ -80,7 +80,7 @@ function Mountains() {
       setPeakNumber(newMountains.length);
       setMountains(newMountains);
     } catch (error) {
-      console.log('Failed to get mountains:', error);
+      console.log('Failed to get mountains from all configured backends:', mountainsBaseUrls, error);
     }
   }
 
