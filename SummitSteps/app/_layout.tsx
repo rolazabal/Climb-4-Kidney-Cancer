@@ -41,12 +41,22 @@ function RootLayout() {
   const [taskStatus, setTaskStatus] = useState<BackgroundTask.BackgroundTaskStatus | null>(null);
 
   // helper methods
-  async function assignElevationToClimbs(ids: String[], feet: number) {
-    // do stuff
+  async function assignElevationToClimbs(ids: string[], feet: number) {
+    let distributed = feet / ids.length;
+
+    let db = await getConnection();
+    let statement = await db.prepareAsync('UPDATE climbs SET elevation = elevation + $feet WHERE id = $id');
+
+    ids.forEach(async (id) => {
+      await statement.executeAsync({$feet: distributed, $id: id});
+    });
+
+    await statement.finalizeAsync();
   }
 
-  async function summitClimbs(ids: String[]) {
+  async function summitClimbs(ids: string[]) {
     // check ids, process summits, and return new array of active climb ids
+    //'SELECT * FROM climbs as c JOIN mountains as m ON c.mountain_id = m.id WHERE c.elevation >= m.height'
   }
 
   TaskManager.defineTask(DATA_TASK_ID, async () => {
