@@ -5,6 +5,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+import { getConnection } from "../_layout";
+
+const db = getConnection();
 
 const c = Colors.light;
 
@@ -27,6 +30,7 @@ type ProgressClimbRecord = {
   height: number;
   status?: "active" | "inactive" | "complete";
   group: string | null;
+  isLeader: boolean;
 };
 
 type MountainDetail = {
@@ -48,6 +52,7 @@ const mockLeaderGroupsByUserId: Record<string, LeaderGroup[]> = {
   ],
 };
 
+// Dummy data
 const mockMountainDetails: Record<string, MountainDetail> = {
   denali: {
     uuid: "denali",
@@ -75,6 +80,7 @@ const mockMountainDetails: Record<string, MountainDetail> = {
   },
 };
 
+// Dummy data
 const initialInProgressMountains: InProgressMountain[] = [
   {
     id: "elbert",
@@ -84,6 +90,7 @@ const initialInProgressMountains: InProgressMountain[] = [
     group: null,
     progressFt: 4520,
     isPaused: false,
+    //is_leader: true,
   },
   {
     id: "denali-1",
@@ -118,7 +125,7 @@ function Climbs() {
   const { userId } = useAuth();
   const [isSelectingMountain, setIsSelectingMountain] = useState(false);
   const [availableMountains, setAvailableMountains] = useState<Mountain[]>([]);
-  const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
+  const [inProgressMountains, setInProgressMountains] = useState<InProgressMountain[]>([]);
   const [isLoadingAvailableClimbs, setIsLoadingAvailableClimbs] = useState(false);
   const [availableClimbsError, setAvailableClimbsError] = useState<string | null>(null);
   const [selectedClimbAudience, setSelectedClimbAudience] = useState<string>("individual");
@@ -166,6 +173,7 @@ function Climbs() {
     return response.json();
   }
 
+  //use the local db to try and get the mountain details
   const loadAvailableClimbs = useCallback(async () => {
     if (!userId) {
       setAvailableMountains([]);
