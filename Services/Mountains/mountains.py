@@ -313,12 +313,17 @@ async def get_mountain_gallery(mountain_id: str):
     if not row["image_url"]:
         raise HTTPException(404, "No image associated with this mountain")
 
-    # Consistency Rule: The image_url in the DB is just a filename (e.g. "mt_bierstadt.png"), 
-    # and the S3 folder structure is organized by mountain stem 
-    # (e.g. "MountainsImages/mt_bierstadt/mt_bierstadt.png"). 
+    # Consistency Rule: The image_url in the DB is just a filename (e.g. "mt_bierstadt.png"),
+    # and the S3 folder structure is organized by mountain stem
+    # (e.g. "MountainsImages/mt_bierstadt/mt_bierstadt.png").
     # This way, we can easily find all images for a mountain by using the stem as a prefix.
     stem = os.path.splitext(row["image_url"])[0]  # "mt_bierstadt"
     keys = list_mountain_image_keys(stem)
+
+    # Exclude the stem/hero image (already served by /image-url).
+    # Gallery should only contain the other images in the folder.
+    stem_key = to_mountain_key(row["image_url"])  # "MountainsImages/mt_bierstadt/mt_bierstadt.png"
+    keys = [k for k in keys if k != stem_key]
 
     urls = [presigned_get_url(key) for key in keys]
     return {"urls": urls}
