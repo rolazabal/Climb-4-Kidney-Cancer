@@ -129,7 +129,7 @@ async def lifespan(app: FastAPI):
     else:
         raise Exception("Could not connect to Redis")
     
-    app.state.redis = redis_client            
+    app.state.redis = redis_client
     
     yield
     
