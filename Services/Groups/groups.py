@@ -25,37 +25,6 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def require_leader(group_id: uuid.UUID):
-    """
-    Returns a FastAPI dependency that checks whether the current user
-    holds the 'Leader' role for the given group_id path parameter.
-    Usage: Depends(require_leader_for(group_id))  — see routes below.
-    """
-    # We use a closure so the dependency captures group_id from the path.
-    async def _check(
-        current_user: str = Depends(get_current_user),
-        pool=Depends(lambda: app.state.pool),
-    ):
-        user_id = current_user  # sub from JWT — adjust if your payload shape differs
-        async with pool.acquire() as conn:
-            role = await conn.fetchval(
-                """
-                SELECT role FROM group_members
-                WHERE group_id = $1 AND user_id = $2
-                """,
-                group_id,
-                uuid.UUID(str(user_id)),
-            )
-        if role != "Leader":
-            raise HTTPException(
-                status_code=403,
-                detail="Only group leaders can perform this action",
-            )
-        return current_user
-
-    return _check
-
-
 # --------------------
 # SCHEMAS: GROUPS
 # --------------------
@@ -87,14 +56,6 @@ class GroupClimbProgressUpdate(BaseModel):
 class RenameClimbRequest(BaseModel):
     new_name: str
 
-# --------------------
-# SCHEMAS: GROUP INVITES
-# --------------------
-
-class InviteStatus(str, enum.Enum):
-    pending = "pending"
-    accepted = "accepted"
-    declined = "declined"
 
 # --------------------
 # DB Functions (CRUD) - GROUPS
@@ -280,66 +241,6 @@ async def get_member_role(conn, group_id, user_id):
     raise HTTPException(404, "Member not found in group")
 
 
-# --------------------
-# DB Functions (CRUD) - GROUP INVITES
-# --------------------
-
-async def create_invite(conn, group_id, invitee_id):
-    row = await conn.fetchrow(
-        """
-        INSERT INTO group_invites(group_id, invitee_id)
-        VALUES($1, $2)
-        RETURNING invite_id, group_id, invitee_id, status, created_at
-        """,
-        group_id,
-        invitee_id,
-    )
-    return dict(row)
-
-
-async def list_invites_for_group(conn, group_id):
-    rows = await conn.fetch(
-        """
-        SELECT * FROM group_invites WHERE group_id = $1
-        ORDER BY created_at DESC
-        """,
-        group_id,
-    )
-    return [dict(row) for row in rows]
-
-
-async def list_invites_for_user(conn, user_id):
-    rows = await conn.fetch(
-        """
-        SELECT * FROM group_invites WHERE invitee_id = $1
-        ORDER BY created_at DESC
-        """,
-        user_id,
-    )
-    return [dict(row) for row in rows]
-
-
-async def update_invite(conn, invite_id, invitee_id, status: str):
-    """
-    Updates the invite status. Returns the updated row, or None if
-    the invite doesn't exist or doesn't belong to invitee_id.
-    """
-    row = await conn.fetchrow(
-        """
-        UPDATE group_invites
-        SET status = $1::invite_status
-        WHERE invite_id = $2
-          AND invitee_id = $3
-          AND status = 'pending'
-        RETURNING invite_id, group_id, invitee_id, status
-        """,
-        status,
-        invite_id,
-        invitee_id,
-    )
-    return dict(row) if row else None
-
-
 # --------------
 # LIFESPAN: GROUPS
 # --------------
@@ -403,27 +304,6 @@ async def lifespan(app: FastAPI):
         );
         """)
 
-        # INVITE STATUS ENUM + TABLE
-        await conn.execute("""
-        DO $$
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invite_status') THEN
-                CREATE TYPE invite_status AS ENUM ('pending', 'accepted', 'declined');
-            END IF;
-        END$$;
-        """)
-
-        await conn.execute("""
-        CREATE TABLE IF NOT EXISTS group_invites (
-            invite_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-            group_id    uuid NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
-            invitee_id  uuid NOT NULL,
-            status      invite_status NOT NULL DEFAULT 'pending',
-            created_at  timestamp DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (group_id, invitee_id)          -- prevent duplicate pending invites
-        );
-        """)
-
     yield
     await app.state.pool.close()
 
@@ -463,12 +343,7 @@ async def read_groups():
     return groups
 
 @app.put("/groups/{group_id}")
-async def update_group_info(
-    group_id: uuid.UUID,
-    name: str = Body(None),
-    current_user: str = Depends(get_current_user),
-    _leader=Depends(require_leader(group_id)),
-):
+async def update_group_info(group_id: uuid.UUID, name: str = Body(None), current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await update_group(conn, group_id, name)
     if result == "UPDATE 0":
@@ -476,11 +351,7 @@ async def update_group_info(
     return {"message": "Group updated successfully"}
 
 @app.delete("/groups/{group_id}")
-async def remove_group(
-    group_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-    _leader=Depends(require_leader(group_id)),
-):
+async def remove_group(group_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_group(conn, group_id)
     if result == "DELETE 0":
@@ -543,12 +414,7 @@ async def delete_group_member(group_id: uuid.UUID, user_id: uuid.UUID, current_u
 # --------------------
 
 @app.post("/group-climb/")
-async def create_climb(
-    group_id: uuid.UUID,
-    mountain_id: uuid.UUID,
-    climb_name: str = Body(..., embed=True),
-    current_user: str = Depends(get_current_user)
-):
+async def create_climb(group_id: uuid.UUID, mountain_id: uuid.UUID, climb_name: str = Body(..., embed=True), current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         try:
             new_climb = await create_group_climb(conn, group_id, climb_name, mountain_id)
@@ -616,92 +482,3 @@ async def health():
         return {"status": "ok"}
     except Exception:
         raise HTTPException(status_code=503, detail="Database unavailable")
-
-
-# --------------------
-# ROUTES: Group invites
-# --------------------
-
-@app.post("/groups/{group_id}/invites/")
-async def send_invite(
-    group_id: uuid.UUID,
-    invitee_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-    _leader=Depends(require_leader),
-):
-    """
-    Leader sends an invite to a user. Fails with 409 if a pending
-    invite for this user already exists in this group.
-    """
-    async with app.state.pool.acquire() as conn:
-        try:
-            invite = await create_invite(conn, group_id, invitee_id)
-        except asyncpg.UniqueViolationError:
-            raise HTTPException(409, "A pending invite already exists for this user")
-    return {"message": "Invite sent", "invite": invite}
-
-
-@app.get("/groups/{group_id}/invites/")
-async def read_group_invites(
-    group_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-    _leader=Depends(require_leader),
-):
-    """List all invites for a group."""
-    async with app.state.pool.acquire() as conn:
-        invites = await list_invites_for_group(conn, group_id)
-    return invites
-
-
-@app.get("/users/{user_id}/invites/")
-async def read_user_invites(user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
-    """List all invites for a user."""
-    if str(current_user) != str(user_id):
-        raise HTTPException(403, "Can only view your own invites")
-
-    async with app.state.pool.acquire() as conn:
-        invites = await list_invites_for_user(conn, user_id)
-    return invites
-
-
-@app.post("/invites/{invite_id}/accept")
-async def accept_invite(
-    invite_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-):
-    """
-    Invitee accepts their invite. Atomically marks the invite as
-    accepted and adds the user to group_members as 'Member'.
-    """
-    user_id = uuid.UUID(str(current_user))
-
-    async with app.state.pool.acquire() as conn:
-        async with conn.transaction():
-            updated = await update_invite(conn, invite_id, user_id, "accepted")
-            if not updated:
-                raise HTTPException(
-                    404,
-                    "Invite not found, already responded to, or not addressed to you",
-                )
-            await add_member(conn, updated["group_id"], user_id, "Member")
-
-    return {"message": "Invite accepted, you have joined the group", "invite": updated}
-
-
-@app.post("/invites/{invite_id}/decline")
-async def decline_invite(
-    invite_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-):
-    """Invitee declines their invite."""
-    user_id = uuid.UUID(str(current_user))
-
-    async with app.state.pool.acquire() as conn:
-        updated = await update_invite(conn, invite_id, user_id, "declined")
-
-    if not updated:
-        raise HTTPException(
-            404,
-            "Invite not found, already responded to, or not addressed to you",
-        )
-    return {"message": "Invite declined", "invite": updated}
