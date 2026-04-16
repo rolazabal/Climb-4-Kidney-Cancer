@@ -3,7 +3,6 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DeviceType, insertRecords, readRecords, RecordingMethod } from 'react-native-health-connect';
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getConnection } from '../_layout';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
@@ -23,21 +22,20 @@ function Progress() {
     async function getProgress() {
         console.log("Getting progress");
 
-        let date = new Date();
+        let endDate = new Date();
+        let startDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDay());
 
-        let db = await getConnection();
-        let row = await db.getFirstAsync('SELECT * from times');
-        let old_date = new Date(row.time);
+        console.log(startDate);
 
         const { records } = await readRecords('ElevationGained', {
             timeRangeFilter: {
                 operator: 'between',
-                startTime: old_date.toISOString(),
-                endTime: date.toISOString()
+                startTime: startDate.toISOString(),
+                endTime: endDate.toISOString()
             }
         });
 
-        console.log(records);
+        //console.log(records);
 
         if (records.length < 1) {
             return;
@@ -77,6 +75,8 @@ function Progress() {
         lastDate = date;
 
         console.log(ids);
+
+        await getProgress();
     }
 
     useFocusEffect(useCallback(() => {
@@ -87,7 +87,7 @@ function Progress() {
         <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
             <TouchableOpacity onPress={() => {recordProgress()}}>
                 <Text>
-                    Register
+                    Register 10 ft
                 </Text>
             </TouchableOpacity>
             <View style={{flex: 2}}>

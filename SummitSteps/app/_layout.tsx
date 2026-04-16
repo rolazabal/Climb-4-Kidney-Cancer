@@ -43,26 +43,63 @@ function RootLayout() {
   TaskManager.defineTask(DATA_TASK_ID, async () => {
     console.log("Executing task");
     try {
-      let db = await getConnection();
       let date = new Date();
-      let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $climb, $start)');
-      try {
-        await statement.executeAsync({$time: date.getTime(), $climb: "0", $start: false});
-      } finally {
-        await statement.finalizeAsync();
+
+      let db = await getConnection();
+      let rows = await db.getAllAsync('SELECT * from times');
+      
+      if (rows.length < 1) {
+        return BackgroundTask.BackgroundTaskResult.Success;
       }
-      let row = await db.getFirstAsync('SELECT * from times');
-      let old_date = new Date(row.time);
-      console.log(date);
-      console.log(old_date);
-      const { records } = await readRecords('ElevationGained', {
-        timeRangeFilter: {
-          operator: 'between',
-          startTime: old_date.toISOString(),
-          endTime: date.toISOString()
+
+      let ranges = new Array();
+      let activeClimbs = new Array();
+      let lastDate = new Date();
+
+      rows.forEach((row) => {
+        //console.log(row);
+
+        // get time
+        let curDate = new Date(row.time);
+
+        // if we have active climbs, create a range
+        if (activeClimbs.length > 0) {
+          ranges.push({
+            climbs: activeClimbs,
+            startTime: lastDate.toISOString(),
+            endTime: curDate.toISOString()
+          });
         }
+
+        lastDate = curDate;
+
+        if (row.is_start) {
+          // add new climb to active climbs
+          activeClimbs.push(row.climb_id);
+        } else {
+          // remove climb from active climbs
+          let index = activeClimbs.indexOf(row.climb_id);
+          let temp = activeClimbs.slice(0, index);
+          if (index !== activeClimbs.length - 1) {
+            temp.concat(activeClimbs.slice(index + 1, activeClimbs.length));
+          }
+          activeClimbs = temp;
+        }
+
+        console.log(ranges);
       });
-      console.log(records);
+
+      let recordPromises = ranges.map((range) =>
+        readRecords('ElevationGained', {
+          timeRangeFilter: {
+            operator: 'between',
+            startTime: range.startTime,
+            endTime: range.endTime
+          }
+        }).then((record) => {
+          console.log(record);
+        })
+      );
     } catch (error) {
       console.error("Error executing task", error);
     }
@@ -89,7 +126,8 @@ function RootLayout() {
   async function initializeDatabase() {
     let db = await getConnection();
     await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS times (time INTEGER, climb_id TEXT, is_start BOOLEAN);
+      DROP TABLE IF EXISTS times;
+      CREATE TABLE times (time INTEGER, climb_id TEXT, is_start BOOLEAN);
       CREATE TABLE IF NOT EXISTS climbs (id TEXT, mountain_id TEXT, elevation INTEGER, is_active BOOLEAN);
       DROP TABLE IF EXISTS mountains;
       CREATE TABLE mountains (id TEXT, name TEXT, location TEXT, height INTEGER, summited BOOLEAN);
@@ -99,8 +137,22 @@ function RootLayout() {
     `);
     let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $climb, $start)');
     try {
+      // test dates
       let date = new Date();
+      let date1 = new Date(date);
+      date1.setMinutes(date.getMinutes() + 10);
+      let date2 = new Date(date1);
+      date2.setMinutes(date1.getMinutes() + 10);
+      let date3 = new Date(date2);
+      date3.setMinutes(date2.getMinutes() + 10);
+
+      // insert test climb time data
       await statement.executeAsync({$time: date.getTime(), $climb: "0", $start: true});
+      await statement.executeAsync({$time: date1.getTime(), $climb: "1", $start: true});
+      await statement.executeAsync({$time: date2.getTime(), $climb: "1", $start: false});
+      await statement.executeAsync({$time: date3.getTime(), $climb: "0", $start: false});
+
+      // setup sync table
       statement = await db.prepareAsync('INSERT INTO sync VALUES ($1, $2)');
       await statement.executeAsync({$1: false, $2: false});
     } finally {
