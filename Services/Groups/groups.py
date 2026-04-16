@@ -504,10 +504,8 @@ async def read_groups():
 async def update_group_info(
     group_id: uuid.UUID,
     name: str = Body(None),
-    current_user: str = Depends(get_current_user),
-    pool=Depends(lambda: app.state.pool)
+    current_user: str = Depends(get_current_user)
 ):
-    await require_leader(group_id)(current_user=current_user, pool=pool)  # Ensure user is leader before updating
     async with app.state.pool.acquire() as conn:
         result = await update_group(conn, group_id, name)
     if result == "UPDATE 0":
@@ -517,10 +515,8 @@ async def update_group_info(
 @app.delete("/groups/{group_id}")
 async def remove_group(
     group_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-    pool=Depends(lambda: app.state.pool)
+    current_user: str = Depends(get_current_user)
 ):
-    await require_leader(group_id)(current_user=current_user, pool=pool)  # Ensure user is leader before deleting
     async with app.state.pool.acquire() as conn:
         result = await delete_group(conn, group_id)
     if result == "DELETE 0":
@@ -661,14 +657,12 @@ async def health():
 async def send_invite(
     group_id: uuid.UUID,
     invitee_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-    pool=Depends(lambda: app.state.pool)
+    current_user: str = Depends(get_current_user)
 ):
     """
     Leader sends an invite to a user. Fails with 409 if a pending
     invite for this user already exists in this group.
     """
-    await require_leader(group_id)(current_user=current_user, pool=pool)  # Ensure user is leader before sending invite
     async with app.state.pool.acquire() as conn:
         try:
             invite = await create_invite(conn, group_id, invitee_id)
@@ -680,11 +674,9 @@ async def send_invite(
 @app.get("/groups/{group_id}/invites/")
 async def read_group_invites(
     group_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-    pool=Depends(lambda: app.state.pool)
+    current_user: str = Depends(get_current_user)
 ):
     """List all invites for a group."""
-    await require_leader(group_id)(current_user=current_user, pool=pool)  # Ensure user is leader before viewing invites
     async with app.state.pool.acquire() as conn:
         invites = await list_invites_for_group(conn, group_id)
     return invites
