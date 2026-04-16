@@ -1,11 +1,12 @@
 import { THEME_COLORS } from "@/constants/api";
 import { useCallback, useEffect, useState } from "react";
-import { BackHandler, Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Mountain } from "../(tabs)/mountains";
 
 function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 
     const [mountain, setMountain] = useState<Mountain | null>(null);
+    const [urls, setUrls] = useState<string[] | null>(null);
 
     const subscription = BackHandler.addEventListener(
         'hardwareBackPress',
@@ -15,7 +16,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
     );
 
     useEffect(() => {
-    	// get mountain data and images
+    	// get mountain data
         const getMountain = async () => {
             let res = await fetch('https://mountains-service-production.up.railway.app/mountains/' + id, {
                 method: 'GET',
@@ -28,8 +29,22 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
             let data = await res.json();
             setMountain(data);
         };
+        // get mountain images
+        const getUrls = async() => {
+            let res = await fetch('https://mountains-service-production.up.railway.app/mountains/' + id + '/gallery', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (res.status !== 200) {
+                return;
+            }
+            let data = await res.json();
+            setUrls(data.urls);
+            console.log(data.urls);
+        }
         if (id !== null && mountain === null) {
             getMountain();
+            getUrls();
         }
     }, []);
 
@@ -42,8 +57,8 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
         setVisibleIndex(viewableItems[0].index);
     }, []);
 
-    const mountainImage = ({ image }) => (
-        <Image style={styles.img} source={{uri: "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fstatic.vecteezy.com%2Fsystem%2Fresources%2Fpreviews%2F012%2F168%2F187%2Flarge_2x%2Fbeautiful-sunset-on-the-beach-with-palm-tree-for-travel-and-vacation-free-photo.JPG&f=1&nofb=1&ipt=17a644e042b90a73a2d8aa295d51bed71101dc75cb7c23525ba5c87435cf3371"}} />
+    const mountainImage = (info: ListRenderItemInfo<string>) => (
+        <Image style={styles.img} source={{uri: info.item}} />
     );
 
     const viewabilityConfig = {
@@ -68,15 +83,14 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                     horizontal
                     snapToAlignment="start"
                     snapToInterval={width}
-                    data={[{id: '1'}, {id: '2'}, {id: '3'}]}
-                    renderItem={(image) => mountainImage(image)}
-                    keyExtractor={(item) => item.id}
+                    data={urls}
+                    renderItem={mountainImage}
                     viewabilityConfig={viewabilityConfig}
                     onViewableItemsChanged={onViewableItemsChanged}
                     style={{borderRadius: 10}}
                 />
                 <Text>
-                    {visibleIndex}
+                    {visibleIndex + 1}
                 </Text>
             </View>
             {mountain !== null && <View style={{flex: 3}}>
