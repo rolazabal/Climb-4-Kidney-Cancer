@@ -13,10 +13,8 @@ from pydantic import BaseModel
 from datetime import date
 from enum import Enum
 
-import sys
-sys.path.insert(0, "../App/Services")  # add Services directory to path for imports
+from Services import config
 
-import config # for service URLs
 USERS_SERVICE_URL = config.USERS_SERVICE_URL
 MOUNTAINS_SERVICE_URL = config.MOUNTAINS_SERVICE_URL
 
