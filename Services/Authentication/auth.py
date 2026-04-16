@@ -182,6 +182,11 @@ async def revoke_session(redis_client, sid: str):
 async def request_login(payload: RequestLogin):
     redis_client = app.state.redis
     
+    # Check user exists FIRST before touching rate limit
+    user = await get_user_by_email(payload.email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
     # Rate limit (1 request for OTP per 60 seconds)
     otp_key = f"auth:otp:{payload.email}"
     rate_limit_key = f"auth:otp_req:{payload.email}"
@@ -206,14 +211,8 @@ async def request_login(payload: RequestLogin):
             status_code=429,
             detail="OTP already sent. Please wait."
         )
-    
-    user = await get_user_by_email(payload.email)
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
 
     code = generate_otp()
-    
     
     await redis_client.set(
         f"auth:otp:{payload.email}",
