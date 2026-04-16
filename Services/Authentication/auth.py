@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 from pydantic import BaseModel, EmailStr
+import resend
 
 # -----------------
 # ENV + CONFIG
@@ -19,6 +20,8 @@ SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
+resend.api_key = os.getenv("RESEND_API_KEY")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@summitstepsapp.com")
 
 USERS_SERVICE_URL = "http://users-service:8000"
 
@@ -79,17 +82,40 @@ def verify_token(token: str):
 def generate_otp():
     return str(secrets.randbelow(900000) + 100000)
 
+def send_otp_email(to_email: str, code: str) -> None:
+    resend.Emails.send({
+        "from": FROM_EMAIL,
+        "to": [to_email],
+        "subject": "Your login code",
+        "text": f"Your login code is {code}. It expires in 5 minutes.",
+        "html": f"""
+        <html>
+          <body>
+            <h2>Login Verification</h2>
+            <p>Your login code is:</p>
+            <p style="font-size:24px; font-weight:bold;">{code}</p>
+            <p>This code expires in 5 minutes.</p>
+          </body>
+        </html>
+        """
+    })
+
 # -----------------
 # LIFESPAN
 # -----------------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    redis_client = redis.Redis(
-        host=os.getenv("REDIS_HOST", "redis"),
-        port=int(os.getenv("REDIS_PORT", 6379)),
-        decode_responses=True
-    )
+    redis_url = os.getenv("REDIS_URL")
+    if redis_url:
+        redis_client = redis.from_url(redis_url, decode_responses=True)
+    else:
+        # fallback for local development
+        redis_client = redis.Redis(
+            host=os.getenv("REDIS_HOST", "redis"),
+            port=int(os.getenv("REDIS_PORT", 6379)),
+            decode_responses=True
+        )
     
     # Wait until Redis is ready
     for _ in range(10):
@@ -120,7 +146,7 @@ app = FastAPI(lifespan=lifespan)
 async def get_user_by_email(email: str):
     async with httpx.AsyncClient(timeout=5.0) as client:
         try:
-            response = await client.get(f"{USERS_SERVICE_URL}/users/by-email/{email}")
+            response = await client.get(f"{USERS_SERVICE_URL}/by-email/{email}")
         except httpx.TimeoutException:
             raise HTTPException(status_code=504, detail="Users service timed out")
         except Exception:
@@ -129,8 +155,13 @@ async def get_user_by_email(email: str):
         if response.status_code != 200:
             return None
 
-        return response.json()
-    
+        user = response.json()
+
+        if user.get("is_banned"):
+            raise HTTPException(status_code=403, detail="Account suspended")
+
+        return user
+
     
 async def revoke_session(redis_client, sid: str):
     session_key = f"auth:session:{sid}"
@@ -191,8 +222,13 @@ async def request_login(payload: RequestLogin):
     )
     
 
-    # TODO: replace with real email sending
-    print(f"OTP for {payload.email}: {code}")
+    try:
+        send_otp_email(payload.email, code)
+    except Exception as e:
+        # Roll back rate-limit key so user can retry immediately
+        await redis_client.delete(rate_limit_key)
+        await redis_client.delete(f"auth:otp:{payload.email}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
     return {
         "message": "OTP sent"
@@ -238,6 +274,13 @@ async def verify_login(payload: VerifyLogin):
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Mark email as verified
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        await client.patch(
+            f"{USERS_SERVICE_URL}/verify-email",
+            json={"email": payload.email}
+        )
 
     access_token = create_access_token({
         "sub": user["uuid"],
