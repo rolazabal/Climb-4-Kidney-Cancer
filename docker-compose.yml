@@ -1,0 +1,89 @@
+services:
+
+  gateway-service:
+    build: .
+    command: uvicorn Services.Gateway.gateway:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - users-service
+      - mountains-service
+      - progress-service
+      - groups-service
+      - events-service
+      - auth-service
+
+  users-service:
+    build: .
+    command: uvicorn Services.Accounts.users:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${USERS_DATABASE_URL}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      FROM_EMAIL: ${FROM_EMAIL}
+    ports:
+      - "8001:8000"
+
+  mountains-service:
+    build: .
+    command: uvicorn Services.Mountains.mountains:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${MOUNTAINS_DATABASE_URL}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+    ports:
+      - "8002:8000"
+
+  progress-service:
+    build: .
+    command: uvicorn Services.Progress.mountain_progress:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8003:8000"
+    environment:
+      DATABASE_URL: ${PROGRESS_DATABASE_URL}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+
+  groups-service:
+    build: .
+    command: uvicorn Services.Groups.groups:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8004:8000"
+    environment:
+      DATABASE_URL: ${GROUPS_DATABASE_URL}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+
+  events-service:
+    build: .
+    command: uvicorn Services.Events.events:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8005:8000"
+    environment:
+      DATABASE_URL: ${EVENTS_DATABASE_URL}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+
+  auth-service:
+    build: .
+    command: uvicorn Services.Authentication.auth:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8006:8000"
+    environment:
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      FROM_EMAIL: ${FROM_EMAIL}
+    depends_on:
+      - users-service
