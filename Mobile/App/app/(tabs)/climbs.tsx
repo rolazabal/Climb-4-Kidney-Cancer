@@ -34,7 +34,7 @@ type ProgressClimbRecord = {
 };
 
 type MountainDetail = {
-  uuid: string;
+  id: string;
   name?: string;
   location?: string;
   height?: number;
@@ -55,25 +55,25 @@ const mockLeaderGroupsByUserId: Record<string, LeaderGroup[]> = {
 // Dummy data
 const mockMountainDetails: Record<string, MountainDetail> = {
   denali: {
-    uuid: "denali",
+    id: "denali",
     name: "Denali",
     location: "Alaska, USA",
     height: 20310,
   },
   rainier: {
-    uuid: "rainier",
+    id: "rainier",
     name: "Mount Rainier",
     location: "Washington, USA",
     height: 14411,
   },
   fuji: {
-    uuid: "fuji",
+    id: "fuji",
     name: "Mount Fuji",
     location: "Japan",
     height: 12388,
   },
   everest: {
-    uuid: "everest",
+    id: "everest",
     name: "Mount Everest",
     location: "Nepal/China",
     height: 29032,
@@ -120,6 +120,7 @@ const initialInProgressMountains: InProgressMountain[] = [
     isPaused: false,
   },
 ];
+
 
 function Climbs() {
   const { userId } = useAuth();
@@ -173,6 +174,18 @@ function Climbs() {
     return response.json();
   }
 
+  async function getLocalMountains(): Promise<MountainDetail[]> {
+    const rows =  await (await db).getAllAsync('SELECT * FROM mountains') as Array<{id: string; name: string; location: string; height: number}>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      location: row.location,
+      height: row.height
+
+    }));
+  }
+
   //use the local db to try and get the mountain details
   const loadAvailableClimbs = useCallback(async () => {
     if (!userId) {
@@ -186,7 +199,7 @@ function Climbs() {
 
     try {
       const climbs = await getUserClimbs(userId);
-      const allMountains = await getAllMountains();
+      const allMountains = await getLocalMountains();
 
       const relevantClimbs = climbs.filter((climb) =>
         selectedClimbAudience === "individual" ? climb.group === null : climb.group === selectedClimbAudience
@@ -207,10 +220,10 @@ function Climbs() {
       );
 
       const nextAvailableMountains = allMountains
-        .filter((mountain) => !unavailableMountainIds.has(mountain.uuid))
+        .filter((mountain) => !unavailableMountainIds.has(mountain.id))
         .filter((mountain) => !locallyActiveMountainNames.has(mountain.name ?? ""))
         .map((mountain) => ({
-          id: mountain.uuid,
+          id: mountain.id,
           name: mountain.name ?? "Unnamed Mountain",
           range: mountain.location ?? "Unknown location",
           elevationFt: Math.round(Number(mountain.height ?? 0)),
