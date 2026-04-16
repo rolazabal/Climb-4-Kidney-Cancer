@@ -12,8 +12,9 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 from datetime import date
 from enum import Enum
+
 import sys
-sys.path.insert(0, "../Services")  # add Services directory to path for imports
+sys.path.insert(0, "../App/Services")  # add Services directory to path for imports
 
 import config # for service URLs
 USERS_SERVICE_URL = config.USERS_SERVICE_URL
