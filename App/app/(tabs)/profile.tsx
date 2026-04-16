@@ -1,18 +1,23 @@
+import { Colors } from "@/constants/theme";
+import { getFlightsClimbed, initHealthKit } from "@/lib/healthkitService";
 import { Ionicons } from "@expo/vector-icons";
 import { Stack } from "expo-router";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
-import { Colors } from "@/constants/theme";
-import { initHealthKit,getFlightsClimbed } from "@/lib/healthkitService";
-import { useEffect, useState } from "react";
 
 type StatItem = {
   id: string;
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: number;
+};
+
+const profile = {
+  username: "username",
+  email: "",
+  currentStreak: 0,
+  longestStreak: 0
 };
 
 type UserProfile = {
