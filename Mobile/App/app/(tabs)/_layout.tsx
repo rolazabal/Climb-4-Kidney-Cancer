@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import React from "react";
 import { Text, TextProps } from "react-native";
-import { Map, Mountain as MountainIcon, TrendingUp, User } from "lucide-react-native";
+import { Map, Mountain as MountainIcon, TrendingUp, User, UserRoundSearch } from "lucide-react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -47,6 +47,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Map color={theme.secondary} size={24} />,
         }}
         />
+        <Tabs.Screen
+        name = "groups"
+        options={{
+          title: "Groups",
+          tabBarIcon: ({ color }) => <UserRoundSearch color={theme.secondary} size={24} />,
+        }}
+        /> 
         <Tabs.Screen
         name="profile"
         options={{

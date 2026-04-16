@@ -48,6 +48,33 @@ const mockLeaderGroupsByUserId: Record<string, LeaderGroup[]> = {
   ],
 };
 
+const mockMountainDetails: Record<string, MountainDetail> = {
+  denali: {
+    uuid: "denali",
+    name: "Denali",
+    location: "Alaska, USA",
+    height: 20310,
+  },
+  rainier: {
+    uuid: "rainier",
+    name: "Mount Rainier",
+    location: "Washington, USA",
+    height: 14411,
+  },
+  fuji: {
+    uuid: "fuji",
+    name: "Mount Fuji",
+    location: "Japan",
+    height: 12388,
+  },
+  everest: {
+    uuid: "everest",
+    name: "Mount Everest",
+    location: "Nepal/China",
+    height: 29032,
+  },
+};
+
 const initialInProgressMountains: InProgressMountain[] = [
   {
     id: "elbert",
@@ -56,6 +83,33 @@ const initialInProgressMountains: InProgressMountain[] = [
     elevationFt: 14440,
     group: null,
     progressFt: 4520,
+    isPaused: false,
+  },
+  {
+    id: "denali-1",
+    name: "denali",
+    range: "Alaska, USA",
+    elevationFt: 20310,
+    group: "kidney-krew",
+    progressFt: 10000,
+    isPaused: false,
+  },
+  {
+    id: "rainier-1",
+    name: "rainier",
+    elevationFt: 14411,
+    group: null,
+    range: "Washington, USA",
+    progressFt: 0,
+    isPaused: false,
+  },
+  {
+    id: "fuji-1",
+    name: "fuji",
+    range: "Japan",
+    elevationFt: 12388,
+    group: "summit-fundraisers",
+    progressFt: 12200,
     isPaused: false,
   },
 ];
