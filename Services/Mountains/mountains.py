@@ -4,6 +4,8 @@ import os
 
 S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
 S3_REGION = os.getenv("S3_REGION", "us-east-2")
+MOUNTAINS_API_URL = "https://climb-4-kidney-cancer-production-fde3.up.railway.app/mountains/mountains"
+
 
 s3 = boto3.client("s3", region_name=S3_REGION)
 
