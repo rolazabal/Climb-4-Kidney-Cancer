@@ -18,7 +18,7 @@ function RootLayout() {
   const colorScheme = useColorScheme();
 
   // permissions
-  async function requestPerms() {
+  async function getPermissions() {
     await requestPermission([
       {
         accessType: 'read',
@@ -40,25 +40,31 @@ function RootLayout() {
   const [taskRegistered, setTaskRegistered] = useState<boolean>(false);
   const [taskStatus, setTaskStatus] = useState<BackgroundTask.BackgroundTaskStatus | null>(null);
 
+  // helper methods
+  async function assignElevationToClimbs(ids: String[], feet: number) {
+    // do stuff
+  }
+
+  async function summitClimbs(ids: String[]) {
+    // check ids, process summits, and return new array of active climb ids
+  }
+
   TaskManager.defineTask(DATA_TASK_ID, async () => {
     console.log("Executing task");
     try {
+      // get current time
       let date = new Date();
 
       let db = await getConnection();
+      // these rows need to be deleted upon being read
       let rows = await db.getAllAsync('SELECT * from times');
       
-      if (rows.length < 1) {
-        return BackgroundTask.BackgroundTaskResult.Success;
-      }
-
       let ranges = new Array();
       let activeClimbs = new Array();
       let lastDate = new Date();
 
+      // process historic climb data ==========================================
       rows.forEach((row) => {
-        //console.log(row);
-
         // get time
         let curDate = new Date(row.time);
 
@@ -80,7 +86,7 @@ function RootLayout() {
           // remove climb from active climbs
           let index = activeClimbs.indexOf(row.climb_id);
           let temp = activeClimbs.slice(0, index);
-          if (index !== activeClimbs.length - 1) {
+          if (index < activeClimbs.length - 1) {
             temp.concat(activeClimbs.slice(index + 1, activeClimbs.length));
           }
           activeClimbs = temp;
@@ -89,6 +95,7 @@ function RootLayout() {
         console.log(ranges);
       });
 
+      // get health data from ranges
       let recordPromises = ranges.map((range) =>
         readRecords('ElevationGained', {
           timeRangeFilter: {
@@ -97,9 +104,33 @@ function RootLayout() {
             endTime: range.endTime
           }
         }).then((record) => {
+          // distribute elevation across active climbs in range
           console.log(record);
+          //await assignElevationToClimbs(activeClimbs, record.elevation.inFeet);
         })
       );
+
+      // process currently active climbs ======================================
+      // 1 check if any active climbs have completed
+      //activeClimbs = summitClimbs(activeClimbs);
+      // 2 get elevation data from lastDate to date
+      let { records } = await readRecords('ElevationGained', {
+        timeRangeFilter: {
+          operator: 'between',
+          startTime: lastDate.toISOString(),
+          endTime: date.toISOString()
+        }
+      });
+      // 3 check if this completes any climbs
+      //assignElevationToClimbs();
+      //activeClimbs = summitClimbs(activeClimbs);
+      // 4 create time table entries for non-completed climbs
+      /*
+      let statement = await db.prepareAsync();
+      let dbPromises = activeClimbs.map((id) => 
+        
+      );
+      */
     } catch (error) {
       console.error("Error executing task", error);
     }
@@ -164,15 +195,16 @@ function RootLayout() {
 
   useEffect(() => {
     const initTask = async () => {
+      // initialize db, permissions, and background task
       await initializeDatabase();
       initialize();
-      await requestPerms();
+      await getPermissions();
       await registerBackgroundTaskAsync();
       await updateAsync();
     };
     console.log("Root Loaded!");
-    // register background task
     initTask();
+
     // create listener for change in appState, capture new state in nextAppState
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (appState.current.match(/inactive|background/) &&
@@ -186,6 +218,7 @@ function RootLayout() {
       // apply the change
       appState.current = nextAppState;
     });
+
     // remove the listener on unmount
     return () => {
       subscription.remove();
