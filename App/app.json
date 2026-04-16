@@ -63,6 +63,30 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "expo": {
+      "ios": {
+        "infoPlist": {
+          "NSHealthShareUsageDescription": "Track your climbing progress using Health data",
+          "NSHealthUpdateUsageDescription": "Update climbing stats based on activity"
+        }
+      },
+      "plugins": [
+        [
+          "react-native-health",
+          {
+            "permissions": {
+              "read": [
+                "FlightsClimbed"
+              ],
+              "write": []
+            }
+          }
+        ]
+      ]
+    },
+    "android": {
+      "package": "com.anonymous.App"
     }
   }
 }

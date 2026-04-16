@@ -5,7 +5,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { Colors } from "@/constants/theme";
-import { USERS_URL } from "@/constants/api";
+import { initHealthKit,getFlightsClimbed } from "@/lib/healthkitService";
+import { useEffect, useState } from "react";
 
 type StatItem = {
   id: string;
@@ -26,46 +27,52 @@ const fallbackProfile: UserProfile = {
   email: "GmailUsername@gmail.com",
 };
 
-const stats: StatItem[] = [
-  { id: "1", icon: "triangle-outline", label: "Mountains Climbed", value: 0 },
-  { id: "2", icon: "trending-up-outline", label: "Total Flights", value: 0 },
-  { id: "3", icon: "locate-outline", label: "Total Elevation (ft)", value: 0 },
-  { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: 0 },
-];
-
 const c = Colors.light;
-
 function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile>(fallbackProfile);
+  const [stats, setStats] = useState<StatItem[]>([
+    { id: "1", icon: "triangle-outline", label: "Mountains Climbed", value: 0 },
+    { id: "2", icon: "trending-up-outline", label: "Total Flights", value: 0 },
+    { id: "3", icon: "locate-outline", label: "Total Elevation (ft)", value: 0 },
+    { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: 0 },
+  ]);
 
-  async function loadUserProfile() {
-    if (!USER_ID) {
-      return;
-    }
+  useEffect(() => {
+    const loadHealthData = async () => {
+      try {
+        //trigger HealthKit authorization and data retrieval
+        await initHealthKit();
+        //get flights climbed in the past week.
+        const results: any = await getFlightsClimbed(
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          new Date().toISOString()
+        );
 
-    try {
-      const res = await fetch(`${USERS_URL}/users/id/${USER_ID}`);
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch user profile: ${res.status}`);
+        const totalFlights = results?.value || 0;
+        const elevation = totalFlights * 10; // approx feet per flight
+        
+        setStats([
+          { id: "1", icon: "triangle-outline", label: "Mountains Climbed", value: Math.floor(elevation / 3000) },
+          { id: "2", icon: "trending-up-outline", label: "Total Flights", value: totalFlights },
+          { id: "3", icon: "locate-outline", label: "Total Elevation (ft)", value: elevation },
+          { id: "4", icon: "trophy-outline", label: "Best Record (ft)", value: elevation },
+        ]);
+      } catch (err) {
+        console.log("HealthKit error:", err);
       }
+    };
 
-      const data = await res.json();
+    loadHealthData();
+  }, []);
 
-      setProfile({
-        username: data.username ?? fallbackProfile.username,
-        email: data.email ?? fallbackProfile.email,
-      });
-    } catch (error) {
-      console.log("Failed to load user profile:", error);
-    }
-  }
-
-  useFocusEffect(
-    useCallback(() => {
-      loadUserProfile();
-    }, [])
-  );
+  const params = useLocalSearchParams<{ username?: string; email?: string }>();
+  const username =
+    typeof params.username === "string" && params.username.trim().length > 0
+      ? params.username.trim()
+      : profile.username;
+  const email =
+    typeof params.email === "string" && params.email.trim().length > 0
+      ? params.email.trim()
+      : profile.email;
 
   return (
     <>
@@ -147,9 +154,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   pageSubtitle: {
-    fontSize: 24,
+    fontSize: 18,
     color: c.subtitle,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   profileCard: {
     backgroundColor: c.surface,
@@ -230,7 +237,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700",
     color: c.heading,
   },

@@ -1,15 +1,8 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
+import { Colors } from '@/constants/theme';
 
-const theme = {
-  primary: 'rgb(51, 51, 51)',
-  secondary: 'rgb(224, 222, 222)',
-  accent: 'rgb(205, 88, 56)',
-  white: '#FFFFFF',
-  background: 'rgb(128, 128, 128)',
-  error: '#B91C1C',
-  placeholder: 'rgb(102, 102, 101)',
-};
+const c = Colors.light;
 
 type EditableFieldProps = {
   label: string;
@@ -51,7 +44,7 @@ export function EditableField({
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
-            placeholderTextColor={theme.placeholder}
+            placeholderTextColor={c.subtitle}
             secureTextEntry={secureTextEntry}
             multiline={multiline}
             maxLength={maxLength}
@@ -77,41 +70,41 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: theme.primary,
+    fontWeight: '700',
+    color: c.heading,
     marginBottom: 6,
   },
   input: {
     borderWidth: 1,
-    borderColor: theme.secondary,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: c.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16,
-    color: theme.primary,
-    backgroundColor: theme.white,
+    color: c.text,
+    backgroundColor: c.inputBackground,
   },
   inputMultiline: {
     minHeight: 80,
     textAlignVertical: 'top',
   },
   inputError: {
-    borderColor: theme.error,
+    borderColor: c.error,
   },
   readOnly: {
     fontSize: 16,
-    color: theme.primary,
+    color: c.text,
     paddingVertical: 10,
   },
   charCount: {
     fontSize: 12,
-    color: theme.placeholder,
+    color: c.subtitle,
     marginTop: 4,
     textAlign: 'right',
   },
   error: {
     fontSize: 12,
-    color: theme.error,
+    color: c.error,
     marginTop: 4,
   },
 });

@@ -32,10 +32,13 @@ android/
 .env.local
 .env.*.local
 
-# Python (you have .venv)
-.venv/
+# Python cache
 __pycache__/
-Services/Mountains/venv/
+*.pyc
+
+# Ignore duplicate files like "file 2.py"
+* 2.py
+* 2.txt
 
 # VSCode
 .vscode/

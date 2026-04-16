@@ -33,7 +33,7 @@ type ProgressRecord = {
   end_date?: string | null;
 };
 
-function Climbs() {
+function MountainsPage() {
   const [isSelectingMountain, setIsSelectingMountain] = useState(false);
   const [availableMountains, setAvailableMountains] = useState<Mountain[]>([]);
   const [inProgressMountains, setInProgressMountains] = useState<InProgressMountain[]>([]);
@@ -543,4 +543,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Climbs;
+export default MountainsPage;
