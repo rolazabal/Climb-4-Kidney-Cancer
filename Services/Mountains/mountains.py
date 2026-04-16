@@ -75,6 +75,48 @@ def to_mountain_key(filename_or_key: str) -> str:
     stem = os.path.splitext(filename)[0]  # "mt_bierstadt"
     return f"{MOUNTAIN_PREFIX}{stem}/{filename}"  # "MountainsImages/mt_bierstadt/mt_bierstadt.png"
 
+
+
+ # def list_mountain_image_keys(mountain_stem: str) -> list[str]: (OLD VERSION))
+    """
+    List every S3 object key under MountainsImages/{mountain_stem}/.
+    Filters out any "directory placeholder" entries (keys ending with '/').
+    """
+    prefix = f"{MOUNTAIN_PREFIX}{mountain_stem}/"
+    keys: list[str] = []
+    continuation_token = None # for pagination, bug prevention in case of many images
+
+    while True:
+        kwargs = {"Bucket": S3_BUCKET, "Prefix": prefix}
+        if continuation_token:
+            # amazon's pagination uses a "continuation token" to get the next page of results
+            kwargs["ContinuationToken"] = continuation_token
+
+        response = s3.list_objects_v2(**kwargs)
+
+        for obj in response.get("Contents", []):
+            key = obj["Key"]
+            if not key.endswith("/"):
+                keys.append(key)
+
+        if response.get("IsTruncated"):
+            continuation_token = response.get("NextContinuationToken")
+        else:
+            break
+
+    return keys 
+
+def list_mountain_image_keys(mountain_stem: str) -> list[str]:
+    prefix = f"{MOUNTAIN_PREFIX}{mountain_stem}/"
+    response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+
+    keys: list[str] = []
+    for obj in response.get("Contents", []):
+        if not obj["Key"].endswith("/"):
+            keys.append(obj["Key"])
+
+    return keys
+
 async def create_mountain(conn, name, height, location, description=None, image_url=None):
     row = await conn.fetchrow('''
         INSERT INTO mountains(name, height, location, description, image_url)
@@ -255,6 +297,31 @@ async def get_mountain_image_url(mountain_id: str):
     # DB stores filename like "mt_bierstadt.png"
     key = to_mountain_key(row["image_url"])  # -> "MountainsImages/mt_bierstadt/mt_bierstadt.png"
     return {"url": presigned_get_url(key)}
+
+
+# Returns presigned URLs for every image in the mountain's S3 folder
+# Other deifnition: every object under MountainsImages/{mountain_stem}/
+@app.get("/mountains/{mountain_id}/gallery")
+async def get_mountain_gallery(mountain_id: str):
+    async with app.state.pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT image_url FROM mountains WHERE uuid=$1::uuid",
+            mountain_id
+        )
+    if not row:
+        raise HTTPException(404, "Mountain not found")
+    if not row["image_url"]:
+        raise HTTPException(404, "No image associated with this mountain")
+
+    # Consistency Rule: The image_url in the DB is just a filename (e.g. "mt_bierstadt.png"), 
+    # and the S3 folder structure is organized by mountain stem 
+    # (e.g. "MountainsImages/mt_bierstadt/mt_bierstadt.png"). 
+    # This way, we can easily find all images for a mountain by using the stem as a prefix.
+    stem = os.path.splitext(row["image_url"])[0]  # "mt_bierstadt"
+    keys = list_mountain_image_keys(stem)
+
+    urls = [presigned_get_url(key) for key in keys]
+    return {"urls": urls}
 
 @app.get("/health")
 async def health():
