@@ -218,6 +218,18 @@ async def get_active_climbs_by_user(user_id: uuid.UUID):
 
     return [dict(record) for record in result]
 
+# get complete climbs by user
+@app.get("/progress/user/{user_id}/complete")
+async def get_completed_climbs_by_user(user_id: uuid.UUID):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.fetch(
+            "SELECT * FROM climbs WHERE user_id=$1 AND status='complete'",
+            user_id
+        )
+    if not result:
+        raise HTTPException(404, "No completed climbs found for user")
+    return [dict(row) for row in result]
+
 # delete climb entry
 @app.delete("/progress/id/{climb_id}")
 async def delete_climb_by_id(climb_id: uuid.UUID):
