@@ -271,15 +271,15 @@ async def verify_login(payload: VerifyLogin):
 
     user = await get_user_by_email(payload.email)
 
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     # Mark email as verified
     async with httpx.AsyncClient(timeout=5.0) as client:
         await client.patch(
             f"{USERS_SERVICE_URL}/verify-email",
             json={"email": payload.email}
         )
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
 
     access_token = create_access_token({
         "sub": user["uuid"],
