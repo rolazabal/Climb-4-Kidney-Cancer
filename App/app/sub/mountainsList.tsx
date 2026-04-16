@@ -29,18 +29,15 @@ function MountainsList({view}: {view: Function}) {
     let row = await db.getFirstAsync('SELECT mountains FROM sync');
     console.log(row);
     try {
-      const res = await apiFetch(`${MOUNTAINS_URL}/mountains`);
+      // request mountain list
+      let res = await apiFetch(MOUNTAINS_URL);
 
       if (res.status === 401) {
         await logOut();
         router.replace("/login");
         return;
       }
-      // request mountain list
-      let res = await fetch(MOUNTAINS_URL, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+
       if (res.status !== 200) {
         console.log('Mountains list failed:', res.status);
         return;

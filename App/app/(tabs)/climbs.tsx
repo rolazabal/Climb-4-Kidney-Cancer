@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from "react";
-import { router, useFocusEffect } from "expo-router";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { apiFetch } from "@/components/apiFetch";
 import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
-import { apiFetch } from "@/utils/apiFetch";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const c = Colors.light;
 

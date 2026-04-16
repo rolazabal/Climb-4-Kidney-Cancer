@@ -1,12 +1,12 @@
+import { apiFetch } from "@/components/apiFetch";
+import { USERS_URL } from "@/constants/api";
+import { Colors } from "@/constants/theme";
+import { useAuth } from "@/context/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCallback, useState } from "react";
-import { Colors } from "@/constants/theme";
-import { USERS_URL } from "@/constants/api";
-import { useAuth } from "@/context/auth";
-import { apiFetch } from "@/utils/apiFetch";
 
 type StatItem = {
   id: string;

@@ -21,7 +21,7 @@ export default function TabLayout() {
           tabBarButton: HapticTab,
         }}>
         <Tabs.Screen
-          name="index"
+          name="climbs"
           options={{
             title: 'Climbs',
             tabBarIcon: ({ color }) => <MountainIcon color={color} size={24} />,
