@@ -182,6 +182,13 @@ async def read_active_climbs_by_user(conn, user_id: uuid.UUID):
     return [dict(row) for row in rows]
 
 
+async def read_completed_climbs_by_user(conn, user_id: uuid.UUID):
+    rows = await conn.fetch(
+        "SELECT * FROM climbs WHERE user_id=$1 AND status='complete'",
+        user_id
+    )
+    return [dict(row) for row in rows]
+
 async def read_climb_by_user(conn, user_id: uuid.UUID):
     rows = await conn.fetch(
         "SELECT * FROM climbs WHERE user_id=$1",
@@ -377,6 +384,15 @@ async def get_active_climbs_by_user(user_id: uuid.UUID):
     if not result:
         raise HTTPException(404, "Climbs not found for user")
 
+    return [dict(record) for record in result]
+
+# get completed climbs by user
+@app.get("/progress/user/{user_id}/complete")
+async def get_completed_climbs_by_user(user_id: uuid.UUID):
+    async with app.state.pool.acquire() as conn:
+        result = await read_completed_climbs_by_user(conn, user_id)
+    if not result:
+        raise HTTPException(404, "No completed climbs found for user")
     return [dict(record) for record in result]
 
 # delete climb entry
