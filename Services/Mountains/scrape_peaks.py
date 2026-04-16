@@ -3,6 +3,8 @@ import re
 import json
 import mimetypes
 from typing import Optional
+from dotenv import load_dotenv
+load_dotenv()
 
 import boto3
 import httpx
@@ -10,11 +12,12 @@ from playwright.sync_api import sync_playwright
 
 
 PEAKS_URL = "https://climb4kc.org/peaks"
-MOUNTAINS_API_URL = os.getenv("MOUNTAINS_API_URL", "http://127.0.0.1:8002/mountains")
+MOUNTAINS_API_URL = "https://climb-4-kidney-cancer-production-fde3.up.railway.app/mountains/mountains"
 
 S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
 S3_REGION = os.getenv("S3_REGION", "us-east-2")
 MOUNTAIN_PREFIX = "MountainsImages/"
+MOUNTAINS_API_TOKEN = os.getenv("MOUNTAINS_API_TOKEN") or os.getenv("AUTH_TOKEN")
 
 DRY_RUN = False  # True면 print + json만 저장, False면 S3 업로드 + API POST까지 실행
 
@@ -50,6 +53,12 @@ def get_extension(image_url: str, content_type: Optional[str]) -> str:
 def build_filename(name: str, image_url: str, content_type: Optional[str]) -> str:
     ext = get_extension(image_url, content_type)
     return f"{slugify(name)}{ext}"
+
+
+def build_s3_key(name: str, image_url: str, content_type: Optional[str]) -> str:
+    mountain_slug = slugify(name)
+    filename = build_filename(name, image_url, content_type)
+    return f"{MOUNTAIN_PREFIX}{mountain_slug}/{filename}"
 
 
 def parse_title_line(title_line: str) -> dict:
@@ -147,8 +156,7 @@ def upload_image_from_url_to_s3(image_url: str, mountain_name: str) -> Optional[
         resp.raise_for_status()
 
         content_type = resp.headers.get("content-type", "image/png")
-        filename = build_filename(mountain_name, image_url, content_type)
-        s3_key = f"{MOUNTAIN_PREFIX}{filename}"
+        s3_key = build_s3_key(mountain_name, image_url, content_type)
 
         s3.put_object(
             Bucket=S3_BUCKET,
@@ -168,9 +176,17 @@ def post_mountain_to_api(mountain: dict) -> dict:
         "description": mountain["description"],
         "url": mountain["s3_key"],
     }
+    headers = {}
+
+    if not MOUNTAINS_API_TOKEN:
+        raise ValueError(
+            "Missing MOUNTAINS_API_TOKEN (or AUTH_TOKEN) for authenticated mountain import."
+        )
+
+    headers["Authorization"] = f"Bearer {MOUNTAINS_API_TOKEN}"
 
     with httpx.Client(timeout=30.0) as client:
-        resp = client.post(MOUNTAINS_API_URL, json=payload)
+        resp = client.post(MOUNTAINS_API_URL, json=payload, headers=headers)
         resp.raise_for_status()
         return resp.json()
 
@@ -179,7 +195,9 @@ def main():
     results = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        # Should be True in production, set to False for debugging
+        # False can show to crawling process
+        browser = p.chromium.launch(headless=False) 
         page = browser.new_page()
         page.goto(PEAKS_URL, wait_until="networkidle")
 
@@ -220,7 +238,11 @@ def main():
                     parsed["source_image_url"] or "",
                     None,
                 )
-                parsed["s3_key"] = f"{MOUNTAIN_PREFIX}{parsed['filename']}"
+                parsed["s3_key"] = build_s3_key(
+                    parsed["name"],
+                    parsed["source_image_url"] or "",
+                    None,
+                )
                 results.append(parsed)
                 continue
 

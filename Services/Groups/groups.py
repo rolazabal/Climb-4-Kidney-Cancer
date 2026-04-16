@@ -28,37 +28,6 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def require_leader(group_id: uuid.UUID):
-    """
-    Returns a FastAPI dependency that checks whether the current user
-    holds the 'Leader' role for the given group_id path parameter.
-    Usage: Depends(require_leader_for(group_id))  — see routes below.
-    """
-    # We use a closure so the dependency captures group_id from the path.
-    async def _check(
-        current_user: str = Depends(get_current_user),
-        pool=Depends(lambda: app.state.pool),
-    ):
-        user_id = current_user  # sub from JWT — adjust if your payload shape differs
-        async with pool.acquire() as conn:
-            role = await conn.fetchval(
-                """
-                SELECT role FROM group_members
-                WHERE group_id = $1 AND user_id = $2
-                """,
-                group_id,
-                uuid.UUID(str(user_id)),
-            )
-        if role != "Leader":
-            raise HTTPException(
-                status_code=403,
-                detail="Only group leaders can perform this action",
-            )
-        return current_user
-
-    return _check
-
-
 # --------------------
 # SCHEMAS: GROUPS
 # --------------------
@@ -90,14 +59,6 @@ class GroupClimbProgressUpdate(BaseModel):
 class RenameClimbRequest(BaseModel):
     new_name: str
 
-# --------------------
-# SCHEMAS: GROUP INVITES
-# --------------------
-
-class InviteStatus(str, enum.Enum):
-    pending = "pending"
-    accepted = "accepted"
-    declined = "declined"
 
 # --------------------
 # DB Functions (CRUD) - GROUPS
@@ -622,12 +583,7 @@ async def delete_group_member(group_id: uuid.UUID, user_id: uuid.UUID, current_u
 # --------------------
 
 @app.post("/group-climb/")
-async def create_climb(
-    group_id: uuid.UUID,
-    mountain_id: uuid.UUID,
-    climb_name: str = Body(..., embed=True),
-    current_user: str = Depends(get_current_user)
-):
+async def create_climb(group_id: uuid.UUID, mountain_id: uuid.UUID, climb_name: str = Body(..., embed=True), current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         try:
             new_climb = await create_group_climb(conn, group_id, climb_name, mountain_id)

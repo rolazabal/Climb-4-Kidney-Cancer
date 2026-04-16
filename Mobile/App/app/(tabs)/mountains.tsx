@@ -2,6 +2,10 @@ import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { MOUNTAINS_URL } from '@/constants/api';
+import { apiFetch } from "@/utils/apiFetch";
+import { router } from 'expo-router';
+import { useAuth } from '@/context/auth';
 
 const theme = {
   primary: 'rgb(51, 51, 51)',
@@ -22,13 +26,13 @@ type Mountain = {
 };
 
 function Mountains() {
-  const mountains_url = 'http://10.0.2.2:8002';
 
   const mountainsClimbed: Mountain[] = [];
   const summits = mountainsClimbed.length;
 
   const [mountains, setMountains] = useState<Mountain[]>([]);
   const [peakNumber, setPeakNumber] = useState(0);
+  const { logOut } = useAuth();
 
   const Tabs = {
     all: 0,
@@ -40,10 +44,13 @@ function Mountains() {
 
   async function getMountains() {
     try {
-      const res = await fetch(`${mountains_url}/mountains`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const res = await apiFetch(`${MOUNTAINS_URL}/mountains`);
+
+      if (res.status === 401) {
+        await logOut();
+        router.replace("/login");
+        return;
+      }
 
       if (res.status !== 200) {
         console.log('Mountains list failed:', res.status);
@@ -53,10 +60,7 @@ function Mountains() {
       const data = await res.json();
 
       const detailPromises = data.map((m: any) =>
-        fetch(`${mountains_url}/mountains/${m.uuid}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }).then(async (r) => {
+        apiFetch(`${MOUNTAINS_URL}/mountains/${m.uuid}`).then(async (r) => {
           if (!r.ok) {
             throw new Error(`Failed to fetch detail for ${m.uuid}: ${r.status}`);
           }
@@ -67,10 +71,7 @@ function Mountains() {
       const details = await Promise.all(detailPromises);
 
       const imagePromises = details.map((m: any) =>
-        fetch(`${mountains_url}/mountains/${m.uuid}/image-url`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        })
+        apiFetch(`${MOUNTAINS_URL}/mountains/${m.uuid}/image-url`)
           .then((r) => (r.status === 200 ? r.json() : null))
           .then((j) => (j?.url ? j.url : null))
           .catch(() => null)

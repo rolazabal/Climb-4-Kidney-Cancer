@@ -1,6 +1,5 @@
 ## IMPORTS
-import random as rnd
-
+import secrets
 import boto3
 import os
 import asyncpg
@@ -14,14 +13,12 @@ from pydantic import BaseModel, EmailStr, field_validator
 from jose import jwt, JWTError
 from pydantic import BaseModel,EmailStr
 import hashlib
+from .email_utils import send_verification_email
 
 S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
 S3_REGION = os.getenv("S3_REGION", "us-east-2")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
-SES_FROM_EMAIL = os.getenv("SES_FROM_EMAIL", "chan202220@gmail.com")
 
 s3 = boto3.client("s3", region_name=S3_REGION)
-ses = boto3.client("sesv2", region_name=AWS_REGION)
 
 USER_PREFIX = "UserImages/"
 
@@ -53,8 +50,9 @@ class User(BaseModel):
     dob: date | None = None
     bio: str | None = None
     profile_photo_media_id: str | None = None
-    role: str = "user"
-    
+    # role is intentionally excluded — always set to "user" on creation.
+    # Use the admin-only PATCH /users/{user_id}/role endpoint to promote users.
+
     @field_validator("username")
     @classmethod
     def username_valid(cls, v):
@@ -65,8 +63,8 @@ class User(BaseModel):
         if not v.replace("_", "").isalnum():
             raise ValueError("Username can only contain letters, numbers, and underscores")
         return v
-    
-    
+
+
     @field_validator("bio")
     @classmethod
     def bio_valid(cls, v):
@@ -80,6 +78,17 @@ class UserPatch(BaseModel):
     dob: date | None = None
     bio: str | None = None
     profile_photo_media_id: str | None = None
+
+class UserRolePatch(BaseModel):
+    role: str
+
+    @field_validator("role")
+    @classmethod
+    def role_valid(cls, v):
+        allowed = {"user", "admin"}
+        if v not in allowed:
+            raise ValueError(f"Role must be one of: {allowed}")
+        return v
 
 class UserSettings(BaseModel):
     user_id: uuid.UUID
@@ -201,7 +210,8 @@ async def lifespan(app: FastAPI):
                 bio TEXT,
                 profile_photo_media_id varchar(255),
                 email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-                role TEXT NOT NULL DEFAULT 'user'
+                role TEXT NOT NULL DEFAULT 'user',
+                is_banned BOOLEAN NOT NULL DEFAULT FALSE
             )
         """)
 
@@ -223,50 +233,29 @@ async def lifespan(app: FastAPI):
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
         """)
-    
+
+        # Seed initial admin from environment variable
+        initial_admin_email = os.getenv("INITIAL_ADMIN_EMAIL")
+        if initial_admin_email:
+            updated = await conn.execute(
+                "UPDATE users SET role = 'admin' WHERE email = $1 AND role != 'admin'",
+                initial_admin_email
+            )
+            if updated.endswith("0"):
+                print(f"[seed] No user found with email '{initial_admin_email}' — skipping admin seed.")
+            else:
+                print(f"[seed] '{initial_admin_email}' promoted to admin.")
+
     yield
 
     # shutdown
     await app.state.pool.close()
 
 def generate_verification_code() -> str:
-    return f"{rnd.randint(0, 999999):06d}"
+    return f"{secrets.randbelow(1000000):06d}"
 
 def hash_verification_code(code: str) -> str:
     return hashlib.sha256(code.encode()).hexdigest()
-
-def send_verification_email(to_email: str, code: str) -> None:
-    ses.send_email(
-        FromEmailAddress=SES_FROM_EMAIL,
-        Destination={"ToAddresses": [to_email]},
-        Content={
-            "Simple": {
-                "Subject": {
-                    "Data": "Your verification code",
-                    "Charset": "UTF-8"
-                },
-                "Body": {
-                    "Text": {
-                        "Data": f"Your verification code is {code}. It expires in 10 minutes.",
-                        "Charset": "UTF-8"
-                    },
-                    "Html": {
-                        "Data": f"""
-                        <html>
-                          <body>
-                            <h2>Email Verification</h2>
-                            <p>Your verification code is:</p>
-                            <p style="font-size:24px;font-weight:bold;">{code}</p>
-                            <p>This code expires in 10 minutes.</p>
-                          </body>
-                        </html>
-                        """,
-                        "Charset": "UTF-8"
-                    }
-                }
-            }
-        }
-    )
 
 app = FastAPI(lifespan=lifespan)
 router = APIRouter()
@@ -281,15 +270,18 @@ router = APIRouter()
 @router.post("/")
 async def add_user(users: User):
     async with app.state.pool.acquire() as conn:
-        new_id = await create_user(
-            conn,
-            users.email,
-            users.username,
-            users.dob,
-            users.bio,
-            users.profile_photo_media_id,
-            users.role
-        )
+        try:
+            new_id = await create_user(
+                conn,
+                users.email,
+                users.username,
+                users.dob,
+                users.bio,
+                users.profile_photo_media_id,
+                role="user"  # always force "user" — role cannot be set by the client
+            )
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(status_code=409, detail="Email or username already taken")
 
     return {"id": new_id}
 
@@ -330,7 +322,11 @@ async def delete_user(user_id: uuid.UUID, current_user: dict = Depends(require_a
 
 # update user entry
 @router.patch("/{user_id}")
-async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: str = Depends(get_current_user)):
+async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: dict = Depends(get_current_user)):
+    # Only the user themselves or an admin may update a profile
+    if current_user.get("role") != "admin" and current_user.get("sub") != str(user_id):
+        raise HTTPException(status_code=403, detail="You can only update your own profile")
+
     data = patch.model_dump(exclude_unset=True, exclude_none=True)
     if "url" in data:
         data["image_url"] = data.pop("url")
@@ -340,6 +336,18 @@ async def patch_user(user_id: uuid.UUID, patch: UserPatch, current_user: str = D
 
     if result.endswith("0"):
         raise HTTPException(404, "User not found")
+
+# update user role (admin only)
+@router.patch("/{user_id}/role")
+async def update_user_role(user_id: uuid.UUID, body: UserRolePatch, current_user: dict = Depends(require_admin)):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET role = $1 WHERE uuid = $2",
+            body.role, user_id
+        )
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+    return {"message": f"User role updated to '{body.role}'"}
 
 # get all users
 @router.get("/")
@@ -391,7 +399,18 @@ async def get_user_by_email(email: str):
 
         return dict(user)
 
-app.include_router(router, prefix="/users", tags=["users"])
+@router.patch("/verify-email")
+async def verify_user_email(req: EmailRequest):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET email_verified = TRUE WHERE email = $1",
+            req.email
+        )
+    if result.endswith("0"):
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "Email verified"}
+
+app.include_router(router, tags=["users"])
 
 
 @app.get("/health")
@@ -428,6 +447,7 @@ async def request_verification(req: EmailRequest):
     return {"message": "Verification email sent"}
 
 
+# Verify the code the user received via email.
 @app.post("/auth/verify-email")
 async def verify_email(req: VerifyEmailRequest):
     async with app.state.pool.acquire() as conn:
@@ -484,3 +504,25 @@ async def verify_email(req: VerifyEmailRequest):
         )
 
     return {"message": "Email verified successfully"}
+
+@router.patch("/{user_id}/ban")
+async def ban_user(user_id: uuid.UUID, current_user: dict = Depends(require_admin)):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET is_banned = TRUE WHERE uuid = $1",
+            user_id
+        )
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+    return {"message": "User banned"}
+
+@router.patch("/{user_id}/unban")
+async def unban_user(user_id: uuid.UUID, current_user: dict = Depends(require_admin)):
+    async with app.state.pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE users SET is_banned = FALSE WHERE uuid = $1",
+            user_id
+        )
+    if result.endswith("0"):
+        raise HTTPException(404, "User not found")
+    return {"message": "User unbanned"}
