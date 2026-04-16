@@ -1,4 +1,7 @@
 import { MOUNTAINS_URL, THEME_COLORS } from '@/constants/api';
+import { useAuth } from '@/context/auth';
+import { apiFetch } from "@/utils/apiFetch";
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Mountain } from '../(tabs)/mountains';
@@ -10,6 +13,7 @@ function MountainsList({view}: {view: Function}) {
 
   const [mountains, setMountains] = useState<Mountain[]>([]);
   const [peakNumber, setPeakNumber] = useState(0);
+  const { logOut } = useAuth();
 
   const Tabs = {
     all: 0,
@@ -24,8 +28,14 @@ function MountainsList({view}: {view: Function}) {
     let db = await getConnection();
     let row = await db.getFirstAsync('SELECT mountains FROM sync');
     console.log(row);
-
     try {
+      const res = await apiFetch(`${MOUNTAINS_URL}/mountains`);
+
+      if (res.status === 401) {
+        await logOut();
+        router.replace("/login");
+        return;
+      }
       // request mountain list
       let res = await fetch(MOUNTAINS_URL, {
         method: 'GET',

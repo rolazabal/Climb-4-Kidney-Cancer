@@ -3,11 +3,8 @@ import re
 import json
 import mimetypes
 from typing import Optional
-<<<<<<< HEAD
-=======
 from dotenv import load_dotenv
 load_dotenv()
->>>>>>> gina
 
 import boto3
 import httpx
@@ -15,19 +12,12 @@ from playwright.sync_api import sync_playwright
 
 
 PEAKS_URL = "https://climb4kc.org/peaks"
-<<<<<<< HEAD
-MOUNTAINS_API_URL = os.getenv("MOUNTAINS_API_URL", "http://127.0.0.1:8002/mountains")
-=======
 MOUNTAINS_API_URL = "https://climb-4-kidney-cancer-production-fde3.up.railway.app/mountains/mountains"
->>>>>>> gina
 
 S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
 S3_REGION = os.getenv("S3_REGION", "us-east-2")
 MOUNTAIN_PREFIX = "MountainsImages/"
-<<<<<<< HEAD
-=======
 MOUNTAINS_API_TOKEN = os.getenv("MOUNTAINS_API_TOKEN") or os.getenv("AUTH_TOKEN")
->>>>>>> gina
 
 DRY_RUN = False  # True면 print + json만 저장, False면 S3 업로드 + API POST까지 실행
 
@@ -65,15 +55,12 @@ def build_filename(name: str, image_url: str, content_type: Optional[str]) -> st
     return f"{slugify(name)}{ext}"
 
 
-<<<<<<< HEAD
-=======
 def build_s3_key(name: str, image_url: str, content_type: Optional[str]) -> str:
     mountain_slug = slugify(name)
     filename = build_filename(name, image_url, content_type)
     return f"{MOUNTAIN_PREFIX}{mountain_slug}/{filename}"
 
 
->>>>>>> gina
 def parse_title_line(title_line: str) -> dict:
     """
     예시:
@@ -169,12 +156,7 @@ def upload_image_from_url_to_s3(image_url: str, mountain_name: str) -> Optional[
         resp.raise_for_status()
 
         content_type = resp.headers.get("content-type", "image/png")
-<<<<<<< HEAD
-        filename = build_filename(mountain_name, image_url, content_type)
-        s3_key = f"{MOUNTAIN_PREFIX}{filename}"
-=======
         s3_key = build_s3_key(mountain_name, image_url, content_type)
->>>>>>> gina
 
         s3.put_object(
             Bucket=S3_BUCKET,
@@ -194,11 +176,6 @@ def post_mountain_to_api(mountain: dict) -> dict:
         "description": mountain["description"],
         "url": mountain["s3_key"],
     }
-<<<<<<< HEAD
-
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.post(MOUNTAINS_API_URL, json=payload)
-=======
     headers = {}
 
     if not MOUNTAINS_API_TOKEN:
@@ -210,7 +187,6 @@ def post_mountain_to_api(mountain: dict) -> dict:
 
     with httpx.Client(timeout=30.0) as client:
         resp = client.post(MOUNTAINS_API_URL, json=payload, headers=headers)
->>>>>>> gina
         resp.raise_for_status()
         return resp.json()
 
@@ -219,13 +195,9 @@ def main():
     results = []
 
     with sync_playwright() as p:
-<<<<<<< HEAD
-        browser = p.chromium.launch(headless=False)
-=======
         # Should be True in production, set to False for debugging
         # False can show to crawling process
         browser = p.chromium.launch(headless=False) 
->>>>>>> gina
         page = browser.new_page()
         page.goto(PEAKS_URL, wait_until="networkidle")
 
@@ -266,15 +238,11 @@ def main():
                     parsed["source_image_url"] or "",
                     None,
                 )
-<<<<<<< HEAD
-                parsed["s3_key"] = f"{MOUNTAIN_PREFIX}{parsed['filename']}"
-=======
                 parsed["s3_key"] = build_s3_key(
                     parsed["name"],
                     parsed["source_image_url"] or "",
                     None,
                 )
->>>>>>> gina
                 results.append(parsed)
                 continue
 
@@ -307,8 +275,4 @@ def main():
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
     main()
-=======
-    main()
->>>>>>> gina

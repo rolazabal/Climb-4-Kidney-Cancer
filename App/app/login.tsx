@@ -1,136 +1,201 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { USERS_URL } from "@/constants/api";
+import { router } from "expo-router";
+import { AUTH_URL, USERS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
 const c = Colors.light;
 
-type UserLookupResponse = {
-  uuid?: string;
-  username?: string;
-};
-
-type CreateUserResponse = {
-  id?: string;
-};
+type Step = "email" | "otp";
+type Mode = "login" | "create";
 
 export default function LoginScreen() {
-  const [mode, setMode] = useState<"login" | "create">("login");
+  const [mode, setMode] = useState<Mode>("login");
+  const [step, setStep] = useState<Step>("email");
+
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [otp, setOtp] = useState("");
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isCreatingAccount = mode === "create";
+
   const { logIn } = useAuth();
+  const isCreatingAccount = mode === "create";
 
-  const resetFormError = () => {
-    if (errorMessage) {
-      setErrorMessage(null);
-    }
-  };
+  const clearError = () => setErrorMessage(null);
 
-  async function handleLogIn() {
+  async function handleEmailSubmit() {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedUsername = username.trim();
 
-    if (!normalizedEmail || !normalizedUsername) {
-      setErrorMessage("Enter both email and username.");
+    if (!normalizedEmail || (isCreatingAccount && !normalizedUsername)) {
+      setErrorMessage(isCreatingAccount ? "Enter both email and username." : "Enter your email.");
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
+    clearError();
 
     try {
-      const response = await fetch(`${USERS_URL}/users/by-email/${encodeURIComponent(normalizedEmail)}`);
+      if (isCreatingAccount) {
+        const res = await fetch(`${USERS_URL}/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normalizedEmail, username: normalizedUsername }),
+        });
 
-      if (response.status === 404) {
-        setErrorMessage("No user found for that email.");
-        return;
+        if (res.status === 409) {
+          setErrorMessage("That email or username is already taken.");
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(`Create user failed: ${res.status}`);
+        }
       }
 
-      if (!response.ok) {
-        throw new Error(`Failed to log in: ${response.status}`);
-      }
-
-      const user: UserLookupResponse = await response.json();
-
-      if (!user.uuid || user.username !== normalizedUsername) {
-        setErrorMessage("Email and username do not match.");
-        return;
-      }
-
-      logIn({
-        userId: user.uuid,
-        email: normalizedEmail,
-        username: normalizedUsername,
-      });
-    } catch (error) {
-      console.log("Failed to log in:", error);
-      setErrorMessage("Could not log in right now.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleCreateAccount() {
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedUsername = username.trim();
-
-    if (!normalizedEmail || !normalizedUsername) {
-      setErrorMessage("Enter both email and username.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMessage(null);
-
-    try {
-      const response = await fetch(`${USERS_URL}/users/`, {
+      const otpRes = await fetch(`${AUTH_URL}/request-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: normalizedEmail,
-          username: normalizedUsername,
-        }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to create user: ${response.status}`);
+      if (otpRes.status === 404) {
+        setErrorMessage("No account found for that email.");
+        return;
+      }
+      if (otpRes.status === 429) {
+        setErrorMessage("Please wait a moment before requesting another code.");
+        return;
+      }
+      if (!otpRes.ok) {
+        throw new Error(`Request OTP failed: ${otpRes.status}`);
       }
 
-      const result: CreateUserResponse = await response.json();
-
-      if (!result.id) {
-        throw new Error("User creation response did not include an id");
-      }
-
-      logIn({
-        userId: result.id,
-        email: normalizedEmail,
-        username: normalizedUsername,
-      });
-    } catch (error) {
-      console.log("Failed to create account:", error);
-      setErrorMessage("Could not create account right now.");
+      setStep("otp");
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function handleSubmit() {
-    if (isSubmitting) {
+  async function handleOtpSubmit() {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedOtp = otp.trim();
+
+    if (normalizedOtp.length !== 6) {
+      setErrorMessage("Enter the 6-digit code from your email.");
       return;
     }
 
-    if (isCreatingAccount) {
-      await handleCreateAccount();
-      return;
-    }
+    setIsSubmitting(true);
+    clearError();
 
-    await handleLogIn();
+    try {
+      const res = await fetch(`${AUTH_URL}/verify-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, code: normalizedOtp }),
+      });
+
+      if (res.status === 401) {
+        setErrorMessage("Incorrect code. Please try again.");
+        return;
+      }
+      if (res.status === 429) {
+        setErrorMessage("Too many attempts. Request a new code.");
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(`Verify OTP failed: ${res.status}`);
+      }
+
+      const { access_token, refresh_token } = await res.json();
+      const payload = JSON.parse(atob(access_token.split(".")[1]));
+
+      let resolvedUsername = username.trim();
+      if (!resolvedUsername) {
+        try {
+          const userRes = await fetch(`${USERS_URL}/by-email/${encodeURIComponent(normalizedEmail)}`, {
+            headers: { Authorization: `Bearer ${access_token}` },
+          });
+          if (userRes.ok) {
+            const user = await userRes.json();
+            resolvedUsername = user.username ?? "";
+          }
+        } catch {
+          // non-fatal — username will be populated later on the profile screen
+        }
+      }
+
+      await logIn({
+        userId: payload.sub,
+        email: normalizedEmail,
+        username: resolvedUsername,
+        accessToken: access_token,
+        refreshToken: refresh_token,
+      });
+
+      router.replace("/(tabs)/climbs");
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Could not verify code. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleResend() {
+    setOtp("");
+    setStep("email");
+    clearError();
+  }
+
+  if (step === "otp") {
+    return (
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <View style={styles.content}>
+          <Text style={styles.pageTitle}>Check your email</Text>
+          <Text style={styles.pageSubtitle}>
+            We sent a 6-digit code to{" "}
+            <Text style={{ fontWeight: "700" }}>{email.trim().toLowerCase()}</Text>
+          </Text>
+
+          <View style={styles.formCard}>
+            <Text style={styles.label}>Verification Code</Text>
+            <TextInput
+              autoFocus
+              keyboardType="number-pad"
+              maxLength={6}
+              onChangeText={(v) => { clearError(); setOtp(v); }}
+              placeholder="123456"
+              placeholderTextColor={c.icon}
+              style={[styles.input, styles.otpInput]}
+              value={otp}
+            />
+
+            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+            <Pressable onPress={handleOtpSubmit} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>
+                {isSubmitting ? "Verifying..." : "Verify Code"}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Didn't receive the code?</Text>
+            <Pressable onPress={handleResend} style={styles.linkButton}>
+              <Text style={styles.linkButtonText}>Resend Code</Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -140,7 +205,7 @@ export default function LoginScreen() {
         <Text style={styles.pageSubtitle}>
           {isCreatingAccount
             ? "Set an email and username for your new account."
-            : "Enter your email and username to continue."}
+            : "We'll send a verification code to your email."}
         </Text>
 
         <View style={styles.formCard}>
@@ -148,47 +213,46 @@ export default function LoginScreen() {
           <TextInput
             autoCapitalize="none"
             keyboardType="email-address"
-            onChangeText={(value) => {
-              resetFormError();
-              setEmail(value);
-            }}
+            onChangeText={(v) => { clearError(); setEmail(v); }}
             placeholder="name@example.com"
             placeholderTextColor={c.icon}
             style={styles.input}
             value={email}
           />
 
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            autoCapitalize="none"
-            onChangeText={(value) => {
-              resetFormError();
-              setUsername(value);
-            }}
-            placeholder={isCreatingAccount ? "new_username" : "username"}
-            placeholderTextColor={c.icon}
-            style={styles.input}
-            value={username}
-          />
+          {isCreatingAccount && (
+            <>
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                autoCapitalize="none"
+                onChangeText={(v) => { clearError(); setUsername(v); }}
+                placeholder="new_username"
+                placeholderTextColor={c.icon}
+                style={styles.input}
+                value={username}
+              />
+            </>
+          )}
 
           {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-          <Pressable onPress={handleSubmit} style={styles.primaryButton}>
+          <Pressable onPress={handleEmailSubmit} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>
-              {isSubmitting ? "Submitting..." : isCreatingAccount ? "Create Account" : "Log In"}
+              {isSubmitting
+                ? "Sending..."
+                : isCreatingAccount
+                ? "Create Account"
+                : "Send Code"}
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            {isCreatingAccount ? "Already have an account?" : "Don&apos;t have an account?"}
+            {isCreatingAccount ? "Already have an account?" : "Don't have an account?"}
           </Text>
           <Pressable
-            onPress={() => {
-              setErrorMessage(null);
-              setMode((current) => (current === "login" ? "create" : "login"));
-            }}
+            onPress={() => { clearError(); setMode((m) => (m === "login" ? "create" : "login")); }}
             style={styles.linkButton}
           >
             <Text style={styles.linkButtonText}>
@@ -287,5 +351,11 @@ const styles = StyleSheet.create({
     color: c.tint,
     fontSize: 15,
     fontWeight: "700",
+  },
+  otpInput: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: 8,
+    textAlign: "center",
   },
 });

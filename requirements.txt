@@ -9,3 +9,4 @@ passlib[bcrypt]
 redis
 email-validator
 python-dotenv
+resend
