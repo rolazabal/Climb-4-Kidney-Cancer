@@ -12,11 +12,9 @@ function Mountains() {
     };
     const [state, setState] = useState(States.List);
 
-    useFocusEffect(
-        useCallback(() => {
-            setState(States.List);
-        }, [])
-    );
+    useFocusEffect(useCallback(() => {
+        setState(States.List);
+    }, []));
     
     const [viewID, setViewID] = useState<string | null>(null);
 

@@ -1,8 +1,9 @@
-import {StyleSheet, Text, View, FlatList, TouchableOpacity} from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { DeviceType, insertRecords, readRecords, RecordingMethod } from 'react-native-health-connect';
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from 'react';
-import { TextAlignCenter } from 'lucide-react-native';
-import { MOUNTAINS_URL, PROGRESS_URL } from '@/constants/api';
+import { getConnection } from '../_layout';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
@@ -17,8 +18,78 @@ function Progress() {
 
     const [elevation, setElevation] = useState(0);
 
+    var lastDate = new Date();
+
+    async function getProgress() {
+        console.log("Getting progress");
+
+        let date = new Date();
+
+        let db = await getConnection();
+        let row = await db.getFirstAsync('SELECT * from times');
+        let old_date = new Date(row.time);
+
+        const { records } = await readRecords('ElevationGained', {
+            timeRangeFilter: {
+                operator: 'between',
+                startTime: old_date.toISOString(),
+                endTime: date.toISOString()
+            }
+        });
+
+        console.log(records);
+
+        if (records.length < 1) {
+            return;
+        }
+
+        let elevation = 0;
+
+        records.forEach((record) => {
+            elevation += record.elevation.inFeet;
+        });
+
+        setElevation(elevation);
+    }
+
+    async function recordProgress() {
+        console.log("Recording progress");
+
+        let date = new Date();
+
+        let ids = await insertRecords([
+            {
+                recordType: 'ElevationGained',
+                elevation: {unit: 'feet', value: 10},
+                startTime: lastDate.toISOString(),
+                endTime: date.toISOString(),
+                metadata: {
+                    recordingMethod: RecordingMethod.RECORDING_METHOD_AUTOMATICALLY_RECORDED,
+                    device: {
+                        manufacturer: 'Google',
+                        model: 'Pixel 9',
+                        type: DeviceType.TYPE_PHONE,
+                    },
+                }
+            }
+        ]);
+
+        lastDate = date;
+
+        console.log(ids);
+    }
+
+    useFocusEffect(useCallback(() => {
+        getProgress();
+    }, []));
+
     return (
         <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
+            <TouchableOpacity onPress={() => {recordProgress()}}>
+                <Text>
+                    Register
+                </Text>
+            </TouchableOpacity>
             <View style={{flex: 2}}>
                 <Text style={styles.label}>
                     Progress

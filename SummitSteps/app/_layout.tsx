@@ -27,6 +27,10 @@ function RootLayout() {
       {
         accessType: 'read',
         recordType: 'ElevationGained'
+      },
+      {
+        accessType: 'write',
+        recordType: 'ElevationGained'
       }
     ]);
   }
@@ -36,30 +40,29 @@ function RootLayout() {
   const [taskRegistered, setTaskRegistered] = useState<boolean>(false);
   const [taskStatus, setTaskStatus] = useState<BackgroundTask.BackgroundTaskStatus | null>(null);
 
-  const [test, setTest] = useState<number>(0);
-
   TaskManager.defineTask(DATA_TASK_ID, async () => {
     console.log("Executing task");
-    setTest(test + 1);
     try {
       let db = await getConnection();
       let date = new Date();
       let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $climb, $start)');
-      const { records } = await readRecords('ElevationGained', {
-        timeRangeFilter: {
-          operator: 'between',
-          startTime: '2023-01-09T12:00:00.405Z',
-          endTime: '2023-01-09T23:53:15.405Z'
-        }
-      });
-      console.log(records);
       try {
         await statement.executeAsync({$time: date.getTime(), $climb: "0", $start: false});
       } finally {
         await statement.finalizeAsync();
       }
       let row = await db.getFirstAsync('SELECT * from times');
-      console.log(row);
+      let old_date = new Date(row.time);
+      console.log(date);
+      console.log(old_date);
+      const { records } = await readRecords('ElevationGained', {
+        timeRangeFilter: {
+          operator: 'between',
+          startTime: old_date.toISOString(),
+          endTime: date.toISOString()
+        }
+      });
+      console.log(records);
     } catch (error) {
       console.error("Error executing task", error);
     }
