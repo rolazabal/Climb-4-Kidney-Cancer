@@ -13,7 +13,6 @@ from pydantic import BaseModel, EmailStr, field_validator
 from jose import jwt, JWTError
 from pydantic import BaseModel,EmailStr
 import hashlib
-from .email_utils import send_verification_email
 
 S3_BUCKET = os.getenv("S3_BUCKET", "summitstepimages")
 S3_REGION = os.getenv("S3_REGION", "us-east-2")
