@@ -12,8 +12,12 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 from datetime import date
 from enum import Enum
+import sys
+sys.path.insert(0, "../Services")  # add Services directory to path for imports
 
-from Services.config import USERS_SERVICE_URL, MOUNTAINS_SERVICE_URL # For http/ports
+import config # for service URLs
+USERS_SERVICE_URL = config.USERS_SERVICE_URL
+MOUNTAINS_SERVICE_URL = config.MOUNTAINS_SERVICE_URL
 
 # Security
 security = HTTPBearer()
