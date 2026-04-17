@@ -21,12 +21,13 @@ function Progress() {
     var lastDate = new Date();
 
     async function getProgress() {
-        console.log("Getting progress");
+        //console.log("Getting progress");
 
         let endDate = new Date();
-        let startDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDay());
+        let startDate = new Date(endDate);
+        startDate.setUTCHours(0, 0, 0, 0);
 
-        console.log(startDate);
+        //console.log(startDate);
 
         const { records } = await readRecords('ElevationGained', {
             timeRangeFilter: {

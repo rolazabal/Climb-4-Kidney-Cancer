@@ -20,7 +20,6 @@ function RootLayout() {
 
   // permissions
   async function getPermissions() {
-    console.log("requestijg perms...")
     let granted = await requestPermission([
       {
         accessType: 'read',
@@ -35,8 +34,6 @@ function RootLayout() {
         recordType: 'ElevationGained'
       }
     ]);
-    console.log("graned perms");
-    console.log(granted);
   }
 
   // define background task
@@ -152,7 +149,7 @@ function RootLayout() {
   });
 
   async function registerBackgroundTaskAsync() {
-    console.log("Registering task");
+    //console.log("Registering task");
     return BackgroundTask.registerTaskAsync(DATA_TASK_ID);
   }
 
@@ -185,6 +182,7 @@ function RootLayout() {
     `);
     let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $climb, $start)');
     try {
+      /*
       // test dates
       let date = new Date();
       let date1 = new Date(date);
@@ -199,7 +197,8 @@ function RootLayout() {
       await statement.executeAsync({$time: date1.getTime(), $climb: "1", $start: true});
       await statement.executeAsync({$time: date2.getTime(), $climb: "1", $start: false});
       await statement.executeAsync({$time: date3.getTime(), $climb: "0", $start: false});
-
+      */
+     
       // setup sync table
       statement = await db.prepareAsync('INSERT INTO sync VALUES ($1, $2)');
       await statement.executeAsync({$1: false, $2: false});
