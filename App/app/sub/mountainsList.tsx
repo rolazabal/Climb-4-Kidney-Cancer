@@ -1,8 +1,8 @@
 import { MOUNTAINS_URL, THEME_COLORS } from '@/constants/api';
 import { useAuth } from '@/context/auth';
-import { apiFetch } from "@/utils/apiFetch";
+import { apiFetch } from "@/components/apiFetch";
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Mountain } from '../(tabs)/mountains';
 import { getConnection } from '../_layout';
@@ -23,11 +23,25 @@ function MountainsList({view}: {view: Function}) {
 
   const [tab, setTab] = useState(Tabs.all);
 
-  async function getMountains() {
+  const getMountains = useCallback(async () => {
     // check sync
     let db = await getConnection();
-    let row = await db.getFirstAsync('SELECT mountains FROM sync');
-    console.log(row);
+    let row = await db.getFirstAsync<{ mountains: number }>('SELECT mountains FROM sync LIMIT 1');
+
+    if (row?.mountains) {
+      const localMountains = await db.getAllAsync(
+        'SELECT id, name, location, height FROM mountains ORDER BY name ASC'
+      ) as { id: string; name: string; location: string; height: number }[];
+
+      setPeakNumber(localMountains.length);
+      setMountains(localMountains.map((mountain) => ({
+        uuid: mountain.id,
+        name: mountain.name,
+        location: mountain.location,
+        height: mountain.height,
+      })));
+      return;
+    }
     try {
       // request mountain list
       let res = await apiFetch(MOUNTAINS_URL);
@@ -63,6 +77,7 @@ function MountainsList({view}: {view: Function}) {
       setMountains(mountains);
 
       // sync
+      await db.execAsync('DELETE FROM mountains');
       let statement = await db.prepareAsync('INSERT INTO mountains VALUES ($id, $name, $location, $height, $summited)');
       try {
         for (let x in mountains) {
@@ -85,11 +100,11 @@ function MountainsList({view}: {view: Function}) {
     } catch (error) {
       console.log('Failed to get mountains:', error);
     }
-  }
+  }, [logOut]);
 
   useEffect(() => {
     getMountains();
-  }, []);
+  }, [getMountains]);
 
   return (
     <View style={{ flex: 1, marginHorizontal: 10 }}>
