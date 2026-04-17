@@ -1,8 +1,8 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { DeviceType, insertRecords, readRecords, RecordingMethod } from 'react-native-health-connect';
+import { useCallback, useRef, useState } from 'react';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
+import { insertElevationRecord, readElevationRecords } from '@/lib/health';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
@@ -17,7 +17,7 @@ function Progress() {
 
     const [elevation, setElevation] = useState(0);
 
-    var lastDate = new Date();
+    const lastDate = useRef(new Date());
 
     async function getProgress() {
         console.log("Getting progress");
@@ -27,13 +27,7 @@ function Progress() {
 
         console.log(startDate);
 
-        const { records } = await readRecords('ElevationGained', {
-            timeRangeFilter: {
-                operator: 'between',
-                startTime: startDate.toISOString(),
-                endTime: endDate.toISOString()
-            }
-        });
+        const { records } = await readElevationRecords(startDate.toISOString(), endDate.toISOString());
 
         //console.log(records);
 
@@ -55,24 +49,13 @@ function Progress() {
 
         let date = new Date();
 
-        let ids = await insertRecords([
-            {
-                recordType: 'ElevationGained',
-                elevation: {unit: 'feet', value: 10},
-                startTime: lastDate.toISOString(),
-                endTime: date.toISOString(),
-                metadata: {
-                    recordingMethod: RecordingMethod.RECORDING_METHOD_AUTOMATICALLY_RECORDED,
-                    device: {
-                        manufacturer: 'Google',
-                        model: 'Pixel 9',
-                        type: DeviceType.TYPE_PHONE,
-                    },
-                }
-            }
-        ]);
+        let ids = await insertElevationRecord({
+            startTime: lastDate.current.toISOString(),
+            endTime: date.toISOString(),
+            feet: 10,
+        });
 
-        lastDate = date;
+        lastDate.current = date;
 
         console.log(ids);
 
@@ -87,7 +70,7 @@ function Progress() {
         <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
             <TouchableOpacity onPress={() => {recordProgress()}}>
                 <Text>
-                    Register 10 ft
+                    {Platform.OS === 'android' ? 'Register 10 ft' : 'Refresh Health Data'}
                 </Text>
             </TouchableOpacity>
             <View style={{flex: 2}}>

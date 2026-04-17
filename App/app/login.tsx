@@ -188,7 +188,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Didn't receive the code?</Text>
+            <Text style={styles.footerText}>Didn&apos;t receive the code?</Text>
             <Pressable onPress={handleResend} style={styles.linkButton}>
               <Text style={styles.linkButtonText}>Resend Code</Text>
             </Pressable>

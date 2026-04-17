@@ -1,14 +1,14 @@
 import { AuthProvider } from '@/context/auth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { initializeHealthTracking, isHealthTrackingAvailable, readElevationRecords, requestHealthTrackingPermissions } from '@/lib/health';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import * as BackgroundTask from 'expo-background-task';
 import { Stack } from 'expo-router';
 import * as SQLite from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import * as TaskManager from 'expo-task-manager';
-import { useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
-import { initialize, readRecords, requestPermission } from 'react-native-health-connect';
+import { useEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
 import 'react-native-reanimated';
 
 export const unstable_settings = {
@@ -18,49 +18,11 @@ export const unstable_settings = {
 function RootLayout() {
   const colorScheme = useColorScheme();
 
-  // permissions
-  async function getPermissions() {
-    await requestPermission([
-      {
-        accessType: 'read',
-        recordType: 'BackgroundAccessPermission'
-      },
-      {
-        accessType: 'read',
-        recordType: 'ElevationGained'
-      },
-      {
-        accessType: 'write',
-        recordType: 'ElevationGained'
-      }
-    ]);
-  }
-
   // define background task
   const DATA_TASK_ID = 'data_task';
-  const [taskRegistered, setTaskRegistered] = useState<boolean>(false);
-  const [taskStatus, setTaskStatus] = useState<BackgroundTask.BackgroundTaskStatus | null>(null);
 
-  // helper methods
-  async function assignElevationToClimbs(ids: string[], feet: number) {
-    let distributed = feet / ids.length;
-
-    let db = await getConnection();
-    let statement = await db.prepareAsync('UPDATE climbs SET elevation = elevation + $feet WHERE id = $id');
-
-    ids.forEach(async (id) => {
-      await statement.executeAsync({$feet: distributed, $id: id});
-    });
-
-    await statement.finalizeAsync();
-  }
-
-  async function summitClimbs(ids: string[]) {
-    // check ids, process summits, and return new array of active climb ids
-    //'SELECT * FROM climbs as c JOIN mountains as m ON c.mountain_id = m.id WHERE c.elevation >= m.height'
-  }
-
-  TaskManager.defineTask(DATA_TASK_ID, async () => {
+  if (!TaskManager.isTaskDefined(DATA_TASK_ID)) {
+    TaskManager.defineTask(DATA_TASK_ID, async () => {
     console.log("Executing task");
     try {
       // get current time
@@ -107,57 +69,29 @@ function RootLayout() {
       });
 
       // get health data from ranges
-      let recordPromises = ranges.map((range) =>
-        readRecords('ElevationGained', {
-          timeRangeFilter: {
-            operator: 'between',
-            startTime: range.startTime,
-            endTime: range.endTime
-          }
-        }).then((record) => {
+      await Promise.all(ranges.map((range) =>
+        readElevationRecords(range.startTime, range.endTime).then((record) => {
           // distribute elevation across active climbs in range
           console.log(record);
-          //await assignElevationToClimbs(activeClimbs, record.elevation.inFeet);
+          // TODO: distribute recorded elevation across active climbs.
         })
-      );
+      ));
 
       // process currently active climbs ======================================
-      // 1 check if any active climbs have completed
-      //activeClimbs = summitClimbs(activeClimbs);
-      // 2 get elevation data from lastDate to date
-      let { records } = await readRecords('ElevationGained', {
-        timeRangeFilter: {
-          operator: 'between',
-          startTime: lastDate.toISOString(),
-          endTime: date.toISOString()
-        }
-      });
-      // 3 check if this completes any climbs
-      //assignElevationToClimbs();
-      //activeClimbs = summitClimbs(activeClimbs);
-      // 4 create time table entries for non-completed climbs
-      /*
-      let statement = await db.prepareAsync();
-      let dbPromises = activeClimbs.map((id) => 
-        
-      );
-      */
+      let { records } = await readElevationRecords(lastDate.toISOString(), date.toISOString());
+      if (records.length > 0) {
+        console.log(`Read ${records.length} current elevation records`);
+      }
     } catch (error) {
       console.error("Error executing task", error);
     }
     return BackgroundTask.BackgroundTaskResult.Success;
-  });
+    });
+  }
 
   async function registerBackgroundTaskAsync() {
     console.log("Registering task");
     return BackgroundTask.registerTaskAsync(DATA_TASK_ID);
-  }
-
-  async function updateAsync() {
-    const status = await BackgroundTask.getStatusAsync();
-    setTaskStatus(status);
-    const isRegistered = await TaskManager.isTaskRegisteredAsync(DATA_TASK_ID);
-    setTaskRegistered(isRegistered);
   }
 
   async function triggerTask() {
@@ -168,37 +102,22 @@ function RootLayout() {
   async function initializeDatabase() {
     let db = await getConnection();
     await db.execAsync(`
-      DROP TABLE IF EXISTS times;
-      CREATE TABLE times (time INTEGER, climb_id TEXT, is_start BOOLEAN);
-      CREATE TABLE IF NOT EXISTS climbs (id TEXT, mountain_id TEXT, elevation INTEGER, is_active BOOLEAN);
-      DROP TABLE IF EXISTS mountains;
-      CREATE TABLE mountains (id TEXT, name TEXT, location TEXT, height INTEGER, summited BOOLEAN);
+      CREATE TABLE IF NOT EXISTS times (time INTEGER, climb_id TEXT, is_start BOOLEAN);
+      CREATE TABLE IF NOT EXISTS climbs (id TEXT, mountain_id TEXT, elevation INTEGER DEFAULT 0, is_active BOOLEAN DEFAULT 1);
+      CREATE TABLE IF NOT EXISTS mountains (id TEXT, name TEXT, location TEXT, height INTEGER, summited BOOLEAN DEFAULT 0);
       CREATE TABLE IF NOT EXISTS notifications (id INTEGER, message TEXT, date INTEGER);
-      DROP TABLE IF EXISTS sync;
-      CREATE TABLE sync (mountains BOOLEAN, climbs BOOLEAN);
+      CREATE TABLE IF NOT EXISTS sync (mountains BOOLEAN, climbs BOOLEAN);
     `);
-    let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $climb, $start)');
-    try {
-      // test dates
-      let date = new Date();
-      let date1 = new Date(date);
-      date1.setMinutes(date.getMinutes() + 10);
-      let date2 = new Date(date1);
-      date2.setMinutes(date1.getMinutes() + 10);
-      let date3 = new Date(date2);
-      date3.setMinutes(date2.getMinutes() + 10);
 
-      // insert test climb time data
-      await statement.executeAsync({$time: date.getTime(), $climb: "0", $start: true});
-      await statement.executeAsync({$time: date1.getTime(), $climb: "1", $start: true});
-      await statement.executeAsync({$time: date2.getTime(), $climb: "1", $start: false});
-      await statement.executeAsync({$time: date3.getTime(), $climb: "0", $start: false});
+    const syncRows = await db.getAllAsync('SELECT rowid FROM sync LIMIT 1');
 
-      // setup sync table
-      statement = await db.prepareAsync('INSERT INTO sync VALUES ($1, $2)');
-      await statement.executeAsync({$1: false, $2: false});
-    } finally {
-      await statement.finalizeAsync();
+    if (syncRows.length === 0) {
+      let statement = await db.prepareAsync('INSERT INTO sync VALUES ($mountains, $climbs)');
+      try {
+        await statement.executeAsync({ $mountains: false, $climbs: false });
+      } finally {
+        await statement.finalizeAsync();
+      }
     }
   }
 
@@ -208,10 +127,17 @@ function RootLayout() {
     const initTask = async () => {
       // initialize db, permissions, and background task
       await initializeDatabase();
-      initialize();
-      await getPermissions();
-      await registerBackgroundTaskAsync();
-      await updateAsync();
+
+      if (isHealthTrackingAvailable()) {
+        await initializeHealthTracking();
+        await requestHealthTrackingPermissions();
+      }
+
+      if (Platform.OS === 'android') {
+        await registerBackgroundTaskAsync();
+        await BackgroundTask.getStatusAsync();
+        await TaskManager.isTaskRegisteredAsync(DATA_TASK_ID);
+      }
     };
     console.log("Root Loaded!");
     initTask();
@@ -224,7 +150,9 @@ function RootLayout() {
         console.log("Welcome back!");
       } else {
         console.log("byebye");
-        triggerTask();
+        if (Platform.OS === 'android') {
+          triggerTask();
+        }
       }
       // apply the change
       appState.current = nextAppState;
@@ -251,8 +179,9 @@ function RootLayout() {
 }
 
 export async function getConnection() {
-    let db = await SQLite.openDatabaseAsync("app", {useNewConnection: true});
-    return db;
+    return dbPromise;
 }
+
+const dbPromise = SQLite.openDatabaseAsync("app", { useNewConnection: false });
 
 export default RootLayout;
