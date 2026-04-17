@@ -437,10 +437,10 @@ async def lifespan(app: FastAPI):
         """)
 
         await conn.execute("""
-        CREATE VIEW view_group_stats AS
-        SELECT 
-            g.group_id, 
-            g.name, 
+        CREATE OR REPLACE VIEW view_group_stats AS
+        SELECT
+            g.group_id,
+            g.name,
             count(gm.user_id) as member_count,
             array_agg(gm.user_id) as member_ids
         FROM groups g
@@ -449,8 +449,8 @@ async def lifespan(app: FastAPI):
         """)
 
         await conn.execute("""
-        CREATE VIEW view_active_group_climbs AS
-        SELECT 
+        CREATE OR REPLACE VIEW view_active_group_climbs AS
+        SELECT
             gc.group_climb_id,
             g.name AS group_name,
             gc.climb_name,
