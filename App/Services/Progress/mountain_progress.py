@@ -12,9 +12,7 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 from datetime import date
 from enum import Enum
-
-from App.Services import config
-from config import USERS_SERVICE_URL, MOUNTAINS_SERVICE_URL
+from Services.config import *
 
 # Security
 security = HTTPBearer()
