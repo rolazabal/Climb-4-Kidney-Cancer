@@ -101,7 +101,7 @@ function RootLayout() {
           let index = activeClimbs.indexOf(row.climb_id);
           let temp = activeClimbs.slice(0, index);
           if (index < activeClimbs.length - 1) {
-            temp.concat(activeClimbs.slice(index + 1, activeClimbs.length));
+            temp = temp.concat(activeClimbs.slice(index + 1, activeClimbs.length));
           }
           activeClimbs = temp;
         }
