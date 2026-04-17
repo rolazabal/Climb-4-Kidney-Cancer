@@ -12,7 +12,6 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 from datetime import date
 from enum import Enum
-from Services.config import *
 
 # Security
 security = HTTPBearer()
