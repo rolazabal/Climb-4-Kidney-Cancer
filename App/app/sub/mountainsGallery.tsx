@@ -1,4 +1,4 @@
-import { THEME_COLORS } from "@/constants/api";
+import { MOUNTAINS_URL, THEME_COLORS } from "@/constants/api";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Mountain } from "../(tabs)/mountains";
@@ -18,7 +18,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
     useEffect(() => {
     	// get mountain data
         const getMountain = async () => {
-            let res = await fetch('https://mountains-service-production.up.railway.app/mountains/' + id, {
+            let res = await fetch(MOUNTAINS_URL + '/' + id, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -31,7 +31,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
         };
         // get mountain images
         const getUrls = async() => {
-            let res = await fetch('https://mountains-service-production.up.railway.app/mountains/' + id + '/gallery', {
+            let res = await fetch(MOUNTAINS_URL + '/' + id + '/gallery', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -64,7 +64,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 
     const viewabilityConfig = {
         viewAreaCoveragePercentThreshold: 90,
-        waitForInteraction: true,
+        waitForInteraction: false,
     };
 
     const listRef = useRef<FlatList | null>(null);
@@ -80,7 +80,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
         <View style={{flex: 1, margin: 10}}>
             {mountain !== null && <View style={{flex: 1, flexDirection: "row", paddingBottom: 10}}>
                 <TouchableOpacity style={[{flex: 1}, styles.button]} onPress={() => {back()}}>
-                    <Text style={{color: THEME_COLORS.white}}>
+                    <Text style={{color: THEME_COLORS.white, padding: 5}}>
                         {"Back"}
                     </Text>
                 </TouchableOpacity>
@@ -101,12 +101,9 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                     style={{borderRadius: 10}}
                 />
             </View>
-            <View style={{flex: 1, flexDirection: 'row', paddingHorizontal: 30}}>
+            <View style={{flex: 1, flexDirection: 'row', justifyContent: 'center'}}>
                 {urls?.map((url, index) => (
-                    index === visibleIndex ? 
-                        <TouchableOpacity onPress={() => selectIndex(index)} style={[styles.radio, {backgroundColor: 'red'}]} key={index}></TouchableOpacity>
-                    : 
-                        <TouchableOpacity onPress={() => selectIndex(index)} style={[styles.radio, {backgroundColor: 'blue'}]} key={index}></TouchableOpacity>
+                    <TouchableOpacity onPress={() => selectIndex(index)} style={[styles.radio, {backgroundColor: (visibleIndex === index) ? THEME_COLORS.primary : THEME_COLORS.accent}]} key={index} />
                 ))}
             </View>
             {mountain !== null && <View style={{flex: 5}}>
@@ -139,8 +136,11 @@ const styles = StyleSheet.create({
         backgroundColor: THEME_COLORS.accent
     },
     radio: {
-        flex: 1,
-        borderRadius: 20
+        width: 20,
+        height: 20,
+        alignItems: 'center',
+        margin: 10,
+        borderRadius: '50%',
     }
 });
 

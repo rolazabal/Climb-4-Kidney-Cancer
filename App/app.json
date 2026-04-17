@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SummitSteps",
-    "slug": "SummitSteps",
+    "name": "App",
+    "slug": "App",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,10 +10,15 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.SummitSteps"
+      "bundleIdentifier": "com.anonymous.App"
     },
     "android": {
-      "package": "com.anonymous.App"
+      "package": "com.anonymous.App",
+      "permissions": [
+        "android.permission.health.READ_ELEVATION_GAINED",
+        "android.permission.health.WRITE_ELEVATION_GAINED",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+      ]
     },
     "web": {
       "output": "static",
@@ -51,27 +56,6 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "expo": {
-      "ios": {
-        "infoPlist": {
-          "NSHealthShareUsageDescription": "Track your climbing progress using Health data",
-          "NSHealthUpdateUsageDescription": "Update climbing stats based on activity"
-        }
-      },
-      "plugins": [
-        [
-          "react-native-health",
-          {
-            "permissions": {
-              "read": [
-                "FlightsClimbed"
-              ],
-              "write": []
-            }
-          }
-        ]
-      ]
     }
   }
 }

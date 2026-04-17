@@ -20,7 +20,8 @@ function RootLayout() {
 
   // permissions
   async function getPermissions() {
-    await requestPermission([
+    console.log("requestijg perms...")
+    let granted = await requestPermission([
       {
         accessType: 'read',
         recordType: 'BackgroundAccessPermission'
@@ -34,6 +35,8 @@ function RootLayout() {
         recordType: 'ElevationGained'
       }
     ]);
+    console.log("graned perms");
+    console.log(granted);
   }
 
   // define background task
@@ -161,6 +164,9 @@ function RootLayout() {
   }
 
   async function triggerTask() {
+    if (!taskRegistered) {
+      return;
+    }
     await BackgroundTask.triggerTaskWorkerForTestingAsync();
   }
 

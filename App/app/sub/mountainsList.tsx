@@ -1,11 +1,11 @@
-import { MOUNTAINS_URL, THEME_COLORS } from '@/constants/api';
-import { useAuth } from '@/context/auth';
+import { MOUNTAINS_URL, PROGRESS_URL, THEME_COLORS } from '@/constants/api';
 import { apiFetch } from "@/components/apiFetch";
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Mountain } from '../(tabs)/mountains';
 import { getConnection } from '../_layout';
+import { useAuth } from '@/context/auth';
 
 function MountainsList({view}: {view: Function}) {
   const mountainsClimbed: Mountain[] = [];
@@ -13,7 +13,7 @@ function MountainsList({view}: {view: Function}) {
 
   const [mountains, setMountains] = useState<Mountain[]>([]);
   const [peakNumber, setPeakNumber] = useState(0);
-  const { logOut } = useAuth();
+  const { logOut, userId } = useAuth();
 
   const Tabs = {
     all: 0,
@@ -60,6 +60,17 @@ function MountainsList({view}: {view: Function}) {
       }));
 
       setPeakNumber(mountains.length);
+
+      // get mountains climbed
+      console.log(userId);
+      res = await apiFetch(PROGRESS_URL + '/progress/user/' + userId + '/complete', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+    
+      let ids = await res.json();
+      console.log(ids);
+
       setMountains(mountains);
 
       // sync
