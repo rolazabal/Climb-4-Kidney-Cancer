@@ -13,10 +13,8 @@ from pydantic import BaseModel
 from datetime import date
 from enum import Enum
 
-from Services import config
-
-USERS_SERVICE_URL = config.USERS_SERVICE_URL
-MOUNTAINS_SERVICE_URL = config.MOUNTAINS_SERVICE_URL
+from App.Services import config
+from config import USERS_SERVICE_URL, MOUNTAINS_SERVICE_URL
 
 # Security
 security = HTTPBearer()
