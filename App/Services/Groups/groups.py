@@ -11,6 +11,9 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
+import asyncio
+import httpx
+from Services.config import PROGRESS_SERVICE_URL
 
 # Security
 security = HTTPBearer()
@@ -241,6 +244,115 @@ async def get_member_role(conn, group_id, user_id):
     raise HTTPException(404, "Member not found in group")
 
 
+async def get_all_groups_with_members(conn):
+    """
+    Replaces the previous manual JOIN and dictionary building logic.
+    Uses the SQL View for instant data retrieval.
+    """
+    rows = await conn.fetch("SELECT * FROM view_group_stats")
+    
+    # asyncpg rows can be converted to dicts easily
+    # and PostgreSQL arrays automatically become Python lists.
+    return [dict(row) for row in rows]
+
+
+async def fetch_user_height(client: httpx.AsyncClient, user_id: str) -> float:
+    """
+    Fetches a single user's total_height from the progress service.
+    Returns 0.0 on any error so one bad user doesn't break the leaderboard.
+    """
+    try:
+        resp = await client.get(
+            f"{PROGRESS_SERVICE_URL}/user-progress/{user_id}",
+            timeout=5.0,
+        )
+        if resp.status_code == 200:
+            return resp.json().get("total_height", 0.0)
+    except Exception:
+        pass
+    return 0.0
+
+
+async def compute_group_score(client: httpx.AsyncClient, group: dict) -> dict:
+    """
+    Fans out height fetches for all members of a group concurrently,
+    then sums them into a group score.
+    """
+    if not group["member_ids"]:
+        return {**group, "total_height": 0.0, "member_count": 0}
+
+    heights = await asyncio.gather(
+        *[fetch_user_height(client, uid) for uid in group["member_ids"]]
+    )
+
+    return {
+        "group_id": group["group_id"],
+        "name": group["name"],
+        "total_height": round(sum(heights), 2),
+        "member_count": len(group["member_ids"]),
+    }
+
+
+# --------------------
+# DB Functions (CRUD) - GROUP INVITES
+# --------------------
+
+async def create_invite(conn, group_id, invitee_id):
+    row = await conn.fetchrow(
+        """
+        INSERT INTO group_invites(group_id, invitee_id)
+        VALUES($1, $2)
+        RETURNING invite_id, group_id, invitee_id, status, created_at
+        """,
+        group_id,
+        invitee_id,
+    )
+    return dict(row)
+
+
+async def list_invites_for_group(conn, group_id):
+    rows = await conn.fetch(
+        """
+        SELECT * FROM group_invites WHERE group_id = $1
+        ORDER BY created_at DESC
+        """,
+        group_id,
+    )
+    return [dict(row) for row in rows]
+
+
+async def list_invites_for_user(conn, user_id):
+    rows = await conn.fetch(
+        """
+        SELECT * FROM group_invites WHERE invitee_id = $1
+        ORDER BY created_at DESC
+        """,
+        user_id,
+    )
+    return [dict(row) for row in rows]
+
+
+async def update_invite(conn, invite_id, invitee_id, status: str):
+    """
+    Updates the invite status. Returns the updated row, or None if
+    the invite doesn't exist or doesn't belong to invitee_id.
+    """
+    row = await conn.fetchrow(
+        """
+        UPDATE group_invites
+        SET status = $1::invite_status
+        WHERE invite_id = $2
+          AND invitee_id = $3
+          AND status = 'pending'
+        RETURNING invite_id, group_id, invitee_id, status
+        """,
+        status,
+        invite_id,
+        invitee_id,
+    )
+    return dict(row) if row else None
+
+
 # --------------
 # LIFESPAN: GROUPS
 # --------------
@@ -304,6 +416,52 @@ async def lifespan(app: FastAPI):
         );
         """)
 
+        # INVITE STATUS ENUM + TABLE
+        await conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invite_status') THEN
+                CREATE TYPE invite_status AS ENUM ('pending', 'accepted', 'declined');
+            END IF;
+        END$$;
+        """)
+
+        await conn.execute("""
+        CREATE TABLE IF NOT EXISTS group_invites (
+            invite_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            group_id    uuid NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
+            invitee_id  uuid NOT NULL,
+            status      invite_status NOT NULL DEFAULT 'pending',
+            created_at  timestamp DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (group_id, invitee_id)          -- prevent duplicate pending invites
+        );
+        """)
+
+        await conn.execute("""
+        CREATE VIEW view_group_stats AS
+        SELECT 
+            g.group_id, 
+            g.name, 
+            count(gm.user_id) as member_count,
+            array_agg(gm.user_id) as member_ids
+        FROM groups g
+        LEFT JOIN group_members gm ON g.group_id = gm.group_id
+        GROUP BY g.group_id, g.name;
+        """)
+
+        await conn.execute("""
+        CREATE VIEW view_active_group_climbs AS
+        SELECT 
+            gc.group_climb_id,
+            g.name AS group_name,
+            gc.climb_name,
+            gc.total_height,
+            gc.status
+        FROM group_climb gc
+        JOIN groups g ON gc.group_id = g.group_id
+        WHERE gc.status = 'active';
+        """)
+
     yield
     await app.state.pool.close()
 
@@ -343,7 +501,11 @@ async def read_groups():
     return groups
 
 @app.put("/groups/{group_id}")
-async def update_group_info(group_id: uuid.UUID, name: str = Body(None), current_user: str = Depends(get_current_user)):
+async def update_group_info(
+    group_id: uuid.UUID,
+    name: str = Body(None),
+    current_user: str = Depends(get_current_user)
+):
     async with app.state.pool.acquire() as conn:
         result = await update_group(conn, group_id, name)
     if result == "UPDATE 0":
@@ -351,7 +513,10 @@ async def update_group_info(group_id: uuid.UUID, name: str = Body(None), current
     return {"message": "Group updated successfully"}
 
 @app.delete("/groups/{group_id}")
-async def remove_group(group_id: uuid.UUID, current_user: str = Depends(get_current_user)):
+async def remove_group(
+    group_id: uuid.UUID,
+    current_user: str = Depends(get_current_user)
+):
     async with app.state.pool.acquire() as conn:
         result = await delete_group(conn, group_id)
     if result == "DELETE 0":
@@ -482,3 +647,160 @@ async def health():
         return {"status": "ok"}
     except Exception:
         raise HTTPException(status_code=503, detail="Database unavailable")
+
+
+# --------------------
+# ROUTES: Group invites
+# --------------------
+
+@app.post("/groups/{group_id}/invites/")
+async def send_invite(
+    group_id: uuid.UUID,
+    invitee_id: uuid.UUID,
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Leader sends an invite to a user. Fails with 409 if a pending
+    invite for this user already exists in this group.
+    """
+    async with app.state.pool.acquire() as conn:
+        try:
+            invite = await create_invite(conn, group_id, invitee_id)
+        except asyncpg.UniqueViolationError:
+            raise HTTPException(409, "A pending invite already exists for this user")
+    return {"message": "Invite sent", "invite": invite}
+
+
+@app.get("/groups/{group_id}/invites/")
+async def read_group_invites(
+    group_id: uuid.UUID,
+    current_user: str = Depends(get_current_user)
+):
+    """List all invites for a group."""
+    async with app.state.pool.acquire() as conn:
+        invites = await list_invites_for_group(conn, group_id)
+    return invites
+
+
+@app.get("/users/{user_id}/invites/")
+async def read_user_invites(user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
+    """List all invites for a user."""
+    if str(current_user) != str(user_id):
+        raise HTTPException(403, "Can only view your own invites")
+
+    async with app.state.pool.acquire() as conn:
+        invites = await list_invites_for_user(conn, user_id)
+    return invites
+
+
+@app.post("/invites/{invite_id}/accept")
+async def accept_invite(
+    invite_id: uuid.UUID,
+    current_user: str = Depends(get_current_user),
+):
+    """
+    Invitee accepts their invite. Atomically marks the invite as
+    accepted and adds the user to group_members as 'Member'.
+    """
+    user_id = uuid.UUID(str(current_user))
+
+    async with app.state.pool.acquire() as conn:
+        async with conn.transaction():
+            updated = await update_invite(conn, invite_id, user_id, "accepted")
+            if not updated:
+                raise HTTPException(
+                    404,
+                    "Invite not found, already responded to, or not addressed to you",
+                )
+            await add_member(conn, updated["group_id"], user_id, "Member")
+
+    return {"message": "Invite accepted, you have joined the group", "invite": updated}
+
+
+@app.post("/invites/{invite_id}/decline")
+async def decline_invite(
+    invite_id: uuid.UUID,
+    current_user: str = Depends(get_current_user),
+):
+    """Invitee declines their invite."""
+    user_id = uuid.UUID(str(current_user))
+
+    async with app.state.pool.acquire() as conn:
+        updated = await update_invite(conn, invite_id, user_id, "declined")
+
+    if not updated:
+        raise HTTPException(
+            404,
+            "Invite not found, already responded to, or not addressed to you",
+        )
+    return {"message": "Invite declined", "invite": updated}
+
+
+# --------------------
+# ROUTES: Leaderboard
+# --------------------
+
+@app.get("/leaderboard")
+async def get_leaderboard(limit: int = 10, offset: int = 0):
+    """
+    Returns groups ranked by combined total_height of all members.
+    Fans out to the progress service concurrently for all groups.
+
+    Query params:
+      limit  — number of results to return (default 10, max 100)
+      offset — for pagination (default 0)
+    """
+    limit = min(limit, 100)  # cap to prevent abuse
+
+    async with app.state.pool.acquire() as conn:
+        groups = await get_all_groups_with_members(conn)
+    if not groups:
+        return {"leaderboard": [], "total_groups": 0}
+
+    # Fan out ALL group score computations concurrently
+    async with httpx.AsyncClient() as client:
+        scored_groups = await asyncio.gather(
+            *[compute_group_score(client, g) for g in groups]
+        )
+
+    ranked = sorted(scored_groups, key=lambda g: g["total_height"], reverse=True)
+
+    # Attach rank after sorting, then paginate
+    for i, group in enumerate(ranked, start=1):
+        group["rank"] = i
+
+    page = ranked[offset : offset + limit]
+
+    return {
+        "leaderboard": page,
+        "total_groups": len(ranked),
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+@app.get("/leaderboard/{group_id}")
+async def get_group_rank(group_id: uuid.UUID):
+    """
+    Returns a single group's leaderboard entry and its current rank
+    among all groups. Useful for showing a group 'your rank is #4'.
+    """
+    async with app.state.pool.acquire() as conn:
+        groups = await get_all_groups_with_members(conn)
+
+    group_ids = [g["group_id"] for g in groups]
+    if str(group_id) not in group_ids:
+        raise HTTPException(404, "Group not found")
+
+    async with httpx.AsyncClient() as client:
+        scored_groups = await asyncio.gather(
+            *[compute_group_score(client, g) for g in groups]
+        )
+
+    ranked = sorted(scored_groups, key=lambda g: g["total_height"], reverse=True)
+
+    for i, group in enumerate(ranked, start=1):
+        if group["group_id"] == str(group_id):
+            return {**group, "rank": i, "total_groups": len(ranked)}
+
+    raise HTTPException(404, "Group not found in leaderboard")
