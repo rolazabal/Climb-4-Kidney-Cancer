@@ -13,7 +13,6 @@ from datetime import datetime
 from typing import Optional
 import asyncio
 import httpx
-from Services.config import PROGRESS_SERVICE_URL
 
 # Security
 security = HTTPBearer()
