@@ -215,7 +215,6 @@ function RootLayout() {
     };
     console.log("Root Loaded!");
     initTask();
-
     // create listener for change in appState, capture new state in nextAppState
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (appState.current.match(/inactive|background/) &&
@@ -238,13 +237,13 @@ function RootLayout() {
 
   return (
     <AuthProvider>
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
     </AuthProvider>
   );
 }

@@ -1,5 +1,5 @@
 import { THEME_COLORS } from "@/constants/api";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Mountain } from "../(tabs)/mountains";
 
@@ -48,6 +48,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
         }
     }, []);
 
+    // image picker stuff
     const [visibleIndex, setVisibleIndex] = useState(0);
 
     const onViewableItemsChanged = useCallback(({ viewableItems }) => {
@@ -66,6 +67,15 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
         waitForInteraction: true,
     };
 
+    const listRef = useRef<FlatList | null>(null);
+
+    function selectIndex(index: number) {
+        if (listRef.current === null) {
+            return;
+        }
+        listRef.current.scrollToOffset({offset: index * width, animated: true});
+    }
+
     return(
         <View style={{flex: 1, margin: 10}}>
             {mountain !== null && <View style={{flex: 1, flexDirection: "row", paddingBottom: 10}}>
@@ -78,8 +88,9 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                     {mountain.name}
                 </Text>
             </View>}
-            <View style={{flex: 4}}>
+            <View style={{flex: 8}}>
                 <FlatList
+                    ref={listRef}
                     horizontal
                     snapToAlignment="start"
                     snapToInterval={width}
@@ -89,11 +100,16 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                     onViewableItemsChanged={onViewableItemsChanged}
                     style={{borderRadius: 10}}
                 />
-                <Text>
-                    {visibleIndex + 1}
-                </Text>
             </View>
-            {mountain !== null && <View style={{flex: 3}}>
+            <View style={{flex: 1, flexDirection: 'row', paddingHorizontal: 30}}>
+                {urls?.map((url, index) => (
+                    index === visibleIndex ? 
+                        <TouchableOpacity onPress={() => selectIndex(index)} style={[styles.radio, {backgroundColor: 'red'}]} key={index}></TouchableOpacity>
+                    : 
+                        <TouchableOpacity onPress={() => selectIndex(index)} style={[styles.radio, {backgroundColor: 'blue'}]} key={index}></TouchableOpacity>
+                ))}
+            </View>
+            {mountain !== null && <View style={{flex: 5}}>
                 <Text style={styles.small}>
                     {mountain.description}
                 </Text>
@@ -121,6 +137,10 @@ const styles = StyleSheet.create({
         padding: 10,
         borderRadius: 10,
         backgroundColor: THEME_COLORS.accent
+    },
+    radio: {
+        flex: 1,
+        borderRadius: 20
     }
 });
 

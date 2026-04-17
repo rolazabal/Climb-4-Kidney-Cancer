@@ -1,6 +1,6 @@
 import { MOUNTAINS_URL, THEME_COLORS } from '@/constants/api';
 import { useAuth } from '@/context/auth';
-import { apiFetch } from "@/utils/apiFetch";
+import { apiFetch } from "@/components/apiFetch";
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
