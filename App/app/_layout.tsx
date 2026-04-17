@@ -213,8 +213,8 @@ function RootLayout() {
     const initTask = async () => {
       // initialize db, permissions, and background task
       await initializeDatabase();
-      initialize();
       await getPermissions();
+      await initialize();
       await registerBackgroundTaskAsync();
       await updateAsync();
     };
