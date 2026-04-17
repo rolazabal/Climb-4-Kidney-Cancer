@@ -2,6 +2,7 @@ import { MOUNTAINS_URL, THEME_COLORS } from "@/constants/api";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Mountain } from "../(tabs)/mountains";
+import { ChevronLeft } from "lucide-react-native";
 
 function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 
@@ -40,7 +41,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
             }
             let data = await res.json();
             setUrls(data.urls);
-            console.log(data.urls);
+            //console.log(data.urls);
         }
         if (id !== null && mountain === null) {
             getMountain();
@@ -79,12 +80,10 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
     return(
         <View style={{flex: 1, margin: 10}}>
             {mountain !== null && <View style={{flex: 1, flexDirection: "row", paddingBottom: 10}}>
-                <TouchableOpacity style={[{flex: 1}, styles.button]} onPress={() => {back()}}>
-                    <Text style={{color: THEME_COLORS.white, padding: 5}}>
-                        {"Back"}
-                    </Text>
+                <TouchableOpacity style={[styles.button]} onPress={() => {back()}}>
+                    <ChevronLeft size={30} color={THEME_COLORS.white} />
                 </TouchableOpacity>
-                <Text style={[{flex: 7}, styles.label]}>
+                <Text style={[{flex: 7, marginHorizontal: 10}, styles.label]}>
                     {mountain.name}
                 </Text>
             </View>}
@@ -103,7 +102,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
             </View>
             <View style={{flex: 1, flexDirection: 'row', justifyContent: 'center'}}>
                 {urls?.map((url, index) => (
-                    <TouchableOpacity onPress={() => selectIndex(index)} style={[styles.radio, {backgroundColor: (visibleIndex === index) ? THEME_COLORS.primary : THEME_COLORS.accent}]} key={index} />
+                    <TouchableOpacity onPress={() => selectIndex(index)} style={[styles.radio, {backgroundColor: (visibleIndex !== index) ? THEME_COLORS.primary : THEME_COLORS.accent}]} key={index} />
                 ))}
             </View>
             {mountain !== null && <View style={{flex: 5}}>
@@ -131,13 +130,15 @@ const styles = StyleSheet.create({
         resizeMode: 'cover',
     },
     button: {
+        width: 50,
+        height: 50,
+        borderRadius: '50%',
         padding: 10,
-        borderRadius: 10,
         backgroundColor: THEME_COLORS.accent
     },
     radio: {
-        width: 20,
-        height: 20,
+        width: 15,
+        height: 15,
         alignItems: 'center',
         margin: 10,
         borderRadius: '50%',

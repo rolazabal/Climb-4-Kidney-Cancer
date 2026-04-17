@@ -8,10 +8,9 @@ import { getConnection } from '../_layout';
 import { useAuth } from '@/context/auth';
 
 function MountainsList({view}: {view: Function}) {
-  const mountainsClimbed: Mountain[] = [];
-  const summits = mountainsClimbed.length;
-
-  const [mountains, setMountains] = useState<Mountain[]>([]);
+  const [mountainsToClimb, setMountainsToClimb] = useState<Mountain[]>([]);
+  const [mountainsClimbed, setMountainsClimbed] = useState<Mountain[]>([]);
+  const [summitNumber, setSummitNumber] = useState(0);
   const [peakNumber, setPeakNumber] = useState(0);
   const { logOut, userId } = useAuth();
 
@@ -27,7 +26,8 @@ function MountainsList({view}: {view: Function}) {
     // check sync
     let db = await getConnection();
     let row = await db.getFirstAsync('SELECT mountains FROM sync');
-    console.log(row);
+    //console.log(row);
+
     try {
       // request mountain list
       let res = await apiFetch(MOUNTAINS_URL);
@@ -62,16 +62,33 @@ function MountainsList({view}: {view: Function}) {
       setPeakNumber(mountains.length);
 
       // get mountains climbed
-      console.log(userId);
       res = await apiFetch(PROGRESS_URL + '/progress/user/' + userId + '/complete', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
-    
-      let ids = await res.json();
-      console.log(ids);
+      if (res.status == 200) {
+        let ids = await res.json();
+        ids.forEach((id) => {
+          let index = 0;
+          while(index < mountains.length) {
+            let cur = mountains[index];
+            if (cur.uuid === id) {
+              setMountainsClimbed([...mountainsClimbed, cur]);
+              let temp = mountains.slice(0, index);
+              if (index < mountains.length - 1) {
+                temp = temp.concat(mountains.slice(index + 1, mountains.length));
+              }
+              mountains = temp;
+              break;
+            }
+            index ++;
+          }
+        });
+      }
 
-      setMountains(mountains);
+      setSummitNumber(mountainsClimbed.length);
+
+      setMountainsToClimb(mountains);
 
       // sync
       let statement = await db.prepareAsync('INSERT INTO mountains VALUES ($id, $name, $location, $height, $summited)');
@@ -107,11 +124,11 @@ function MountainsList({view}: {view: Function}) {
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1, marginBottom: 20 }}>
           <Text style={[styles.label, { color: THEME_COLORS.primary }]}>Mountains</Text>
-          <Text style={styles.small}>Explore peaks and track your summits</Text>
+          <Text style={styles.small}>Explore peaks and track your summits.</Text>
         </View>
         <View style={{ flex: 2, marginVertical: 10, flexDirection: 'row' }}>
           <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.climbed)}>
-            <Text style={[styles.label, { color: THEME_COLORS.accent }]}>{summits}</Text>
+            <Text style={[styles.label, { color: THEME_COLORS.accent }]}>{summitNumber}</Text>
             <Text style={styles.small}>Summits</Text>
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
@@ -132,7 +149,7 @@ function MountainsList({view}: {view: Function}) {
             onPress={() => setTab(Tabs.climbed)}
           >
             <Text style={[styles.small, tab === Tabs.climbed && { color: THEME_COLORS.white }]}>
-              Climbed
+              Summited
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -146,9 +163,9 @@ function MountainsList({view}: {view: Function}) {
         </View>
       </View>
       <View style={{ flex: 2 }}>
-        {tab === Tabs.all && <MountainList arr={mountains} view={(id: string) => {view(id)}} />}
+        {tab === Tabs.all && <MountainList arr={mountainsClimbed.concat(mountainsToClimb)} /*view={() => {;}}*/ view={(id: string) => {view(id)}} />}
         {tab === Tabs.climbed && <MountainList arr={mountainsClimbed} view={(id: string) => {view(id)}} />}
-        {tab === Tabs.toClimb && <MountainList arr={mountains} view={(id: string) => {view(id)}} />}
+        {tab === Tabs.toClimb && <MountainList arr={mountainsToClimb} view={() => {;}} /*view={(id: string) => {view(id)}}*/ />}
       </View>
     </View>
   );
@@ -227,6 +244,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     borderRadius: 10,
+    justifyContent: 'center'
   },
   item: {
     flex: 1,

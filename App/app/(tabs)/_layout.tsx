@@ -58,7 +58,7 @@ export function AppText(props: TextProps) {
   return (
     <Text
       {...props}
-      style={[{ fontFamily: 'serif'}, props.style]}
+      style={[/*{ fontFamily: 'serif'},*/ props.style]}
     />
   );
 }
