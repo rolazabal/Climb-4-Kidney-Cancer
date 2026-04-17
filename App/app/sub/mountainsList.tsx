@@ -1,17 +1,19 @@
-import { MOUNTAINS_URL, THEME_COLORS } from '@/constants/api';
+import { MOUNTAINS_URL } from '@/constants/api';
 import { useAuth } from '@/context/auth';
-import { apiFetch } from "@/utils/apiFetch";
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { apiFetch } from "@/components/apiFetch";
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Mountain } from '../(tabs)/mountains';
 import { getConnection } from '../_layout';
+import { Colors } from '@/constants/theme';
+
+const c = Colors.light;
 
 function MountainsList({view}: {view: Function}) {
-  const mountainsClimbed: Mountain[] = [];
-  const summits = mountainsClimbed.length;
-
   const [mountains, setMountains] = useState<Mountain[]>([]);
+  const [climbedMountains, setClimbedMountains] = useState<Mountain[]>([]);
+  const [activeMountains, setActiveMountains] = useState<Mountain[]>([]);
   const [peakNumber, setPeakNumber] = useState(0);
   const { logOut } = useAuth();
 
@@ -23,7 +25,11 @@ function MountainsList({view}: {view: Function}) {
 
   const [tab, setTab] = useState(Tabs.all);
 
-  async function getMountains() {
+  type LocalMountainRow = Mountain & {
+    summited?: number;
+  };
+
+  const getMountains = useCallback(async () => {
     // check sync
     let db = await getConnection();
     let row = await db.getFirstAsync('SELECT mountains FROM sync');
@@ -58,6 +64,7 @@ function MountainsList({view}: {view: Function}) {
         ...mountain,
         image_presigned_url: urls[index],
       }));
+      const mountainsById = new Map(mountains.map((mountain: Mountain) => [mountain.uuid, mountain]));
 
       setPeakNumber(mountains.length);
       setMountains(mountains);
@@ -82,62 +89,105 @@ function MountainsList({view}: {view: Function}) {
       statement = await db.prepareAsync('UPDATE sync SET mountains = true WHERE mountains = false');
       await statement.executeAsync();
       await statement.finalizeAsync();
+
+      const activeRows = await db.getAllAsync(`
+        SELECT DISTINCT m.id AS uuid, m.name, m.location, m.height, m.summited
+        FROM climbs c
+        INNER JOIN mountains m ON m.id = c.mountain_id
+        WHERE c.is_active = 1 AND COALESCE(m.summited, 0) = 0
+        ORDER BY m.name ASC
+      `) as LocalMountainRow[];
+
+      const climbedRows = await db.getAllAsync(`
+        SELECT DISTINCT m.id AS uuid, m.name, m.location, m.height, m.summited
+        FROM mountains m
+        WHERE COALESCE(m.summited, 0) = 1
+        ORDER BY m.name ASC
+      `) as LocalMountainRow[];
+
+      setActiveMountains(
+        activeRows.map((mountain) => ({
+          uuid: mountain.uuid,
+          name: mountainsById.get(mountain.uuid)?.name ?? mountain.name,
+          location: mountainsById.get(mountain.uuid)?.location ?? mountain.location ?? 'Unknown location',
+          height: mountainsById.get(mountain.uuid)?.height ?? mountain.height ?? 0,
+          description: mountainsById.get(mountain.uuid)?.description,
+          image_presigned_url: mountainsById.get(mountain.uuid)?.image_presigned_url ?? null,
+        }))
+      );
+
+      setClimbedMountains(
+        climbedRows.map((mountain) => ({
+          uuid: mountain.uuid,
+          name: mountainsById.get(mountain.uuid)?.name ?? mountain.name,
+          location: mountainsById.get(mountain.uuid)?.location ?? mountain.location ?? 'Unknown location',
+          height: mountainsById.get(mountain.uuid)?.height ?? mountain.height ?? 0,
+          description: mountainsById.get(mountain.uuid)?.description,
+          image_presigned_url: mountainsById.get(mountain.uuid)?.image_presigned_url ?? null,
+        }))
+      );
     } catch (error) {
       console.log('Failed to get mountains:', error);
     }
-  }
+  }, [logOut]);
 
-  useEffect(() => {
-    getMountains();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      getMountains();
+    }, [getMountains])
+  );
+
+  const summits = climbedMountains.length;
 
   return (
-    <View style={{ flex: 1, marginHorizontal: 10 }}>
-      <View style={{ flex: 1 }}>
-        <View style={{ flex: 1, marginBottom: 20 }}>
-          <Text style={[styles.label, { color: THEME_COLORS.primary }]}>Mountains</Text>
-          <Text style={styles.small}>Explore peaks and track your summits</Text>
+    <View style={styles.screen}>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.pageTitle}>Mountains</Text>
+          <Text style={styles.pageSubtitle}>Explore peaks and track your summits.</Text>
         </View>
-        <View style={{ flex: 2, marginVertical: 10, flexDirection: 'row' }}>
-          <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.climbed)}>
-            <Text style={[styles.label, { color: THEME_COLORS.accent }]}>{summits}</Text>
-            <Text style={styles.small}>Summits</Text>
-          </TouchableOpacity>
-          <View style={{ flex: 1 }} />
-          <TouchableOpacity style={styles.info} onPress={() => setTab(Tabs.all)}>
-            <Text style={[styles.label, { color: THEME_COLORS.accent }]}>{peakNumber}</Text>
-            <Text style={styles.small}>Total peaks</Text>
-          </TouchableOpacity>
+
+        <View style={styles.infoRow}>
+          <Pressable style={styles.infoCard} onPress={() => setTab(Tabs.climbed)}>
+            <Text style={styles.infoValue}>{summits}</Text>
+            <Text style={styles.infoLabel}>Summits</Text>
+          </Pressable>
+          <Pressable style={styles.infoCard} onPress={() => setTab(Tabs.all)}>
+            <Text style={styles.infoValue}>{peakNumber}</Text>
+            <Text style={styles.infoLabel}>Total peaks</Text>
+          </Pressable>
         </View>
-        <View style={{ flex: 1, marginBottom: 10, flexDirection: 'row' }}>
-          <TouchableOpacity
-            style={[styles.tab, tab === Tabs.all && { backgroundColor: THEME_COLORS.accent }]}
+
+        <View style={styles.tabRow}>
+          <Pressable
+            style={[styles.tab, tab === Tabs.all && styles.tabActive]}
             onPress={() => setTab(Tabs.all)}
           >
-            <Text style={[styles.small, tab === Tabs.all && { color: THEME_COLORS.white }]}>All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, tab === Tabs.climbed && { backgroundColor: THEME_COLORS.accent }]}
+            <Text style={[styles.tabText, tab === Tabs.all && styles.tabTextActive]}>All</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.tab, tab === Tabs.climbed && styles.tabActive]}
             onPress={() => setTab(Tabs.climbed)}
           >
-            <Text style={[styles.small, tab === Tabs.climbed && { color: THEME_COLORS.white }]}>
+            <Text style={[styles.tabText, tab === Tabs.climbed && styles.tabTextActive]}>
               Climbed
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, tab === Tabs.toClimb && { backgroundColor: THEME_COLORS.accent }]}
+          </Pressable>
+          <Pressable
+            style={[styles.tab, tab === Tabs.toClimb && styles.tabActive]}
             onPress={() => setTab(Tabs.toClimb)}
           >
-            <Text style={[styles.small, tab === Tabs.toClimb && { color: THEME_COLORS.white }]}>
+            <Text style={[styles.tabText, tab === Tabs.toClimb && styles.tabTextActive]}>
               To Climb
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
-      </View>
-      <View style={{ flex: 2 }}>
+
+      <View style={styles.listShell}>
         {tab === Tabs.all && <MountainList arr={mountains} view={(id: string) => {view(id)}} />}
-        {tab === Tabs.climbed && <MountainList arr={mountainsClimbed} view={(id: string) => {view(id)}} />}
-        {tab === Tabs.toClimb && <MountainList arr={mountains} view={(id: string) => {view(id)}} />}
+        {tab === Tabs.climbed && <MountainList arr={climbedMountains} view={(id: string) => {view(id)}} />}
+        {tab === Tabs.toClimb && <MountainList arr={activeMountains} view={(id: string) => {view(id)}} />}
+      </View>
       </View>
     </View>
   );
@@ -145,7 +195,7 @@ function MountainsList({view}: {view: Function}) {
 
 function MountainList({ arr, view }: { arr: Mountain[], view: Function }) {
   const Item = ({ mountain }: { mountain: Mountain }) => (
-    <TouchableOpacity style={styles.item} onPress={() => {view(mountain.uuid)}}>
+    <Pressable style={styles.item} onPress={() => {view(mountain.uuid)}}>
       {mountain.image_presigned_url ? (
         <Image
           source={{ uri: mountain.image_presigned_url }}
@@ -157,32 +207,32 @@ function MountainList({ arr, view }: { arr: Mountain[], view: Function }) {
           style={[
             styles.mountainImage,
             {
-              backgroundColor: '#E5E7EB',
+              backgroundColor: c.surfaceMuted,
               justifyContent: 'center',
               alignItems: 'center',
             },
           ]}
         >
-          <Text style={{ color: THEME_COLORS.secondary }}>No Image</Text>
+          <Text style={styles.emptyImageText}>No Image</Text>
         </View>
       )}
-      <View style={{ padding: 15, backgroundColor: THEME_COLORS.primary }}>
-        <Text style={{ fontSize: 24, color: THEME_COLORS.white }}>{mountain.name}</Text>
+      <View style={styles.itemHeader}>
+        <Text style={styles.itemTitle}>{mountain.name}</Text>
       </View>
-      <View style={{ padding: 15 }}>
-        <Text style={{ fontSize: 18, color: THEME_COLORS.secondary }}>
+      <View style={styles.itemBody}>
+        <Text style={styles.itemSubtitle}>
           {mountain.location ?? 'Unknown location'}
         </Text>
-        <Text style={{ fontSize: 18, color: THEME_COLORS.secondary }}>
+        <Text style={styles.itemMeta}>
           {mountain.height ?? 0} ft
         </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   const EmptyItem = (
-    <View style={[styles.item, { padding: 20 }]}>
-      <Text style={styles.small}>No mountains under this category.</Text>
+    <View style={[styles.item, styles.emptyCard]}>
+      <Text style={styles.emptyStateText}>No mountains under this category.</Text>
     </View>
   );
 
@@ -197,36 +247,130 @@ function MountainList({ arr, view }: { arr: Mountain[], view: Function }) {
 }
 
 const styles = StyleSheet.create({
-  label: {
-    textAlign: 'center',
+  screen: {
+    flex: 1,
+    backgroundColor: c.background,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+    paddingBottom: 24,
+  },
+  header: {
+    marginBottom: 16,
+  },
+  pageTitle: {
     fontSize: 44,
+    fontWeight: '700',
+    color: c.heading,
+    marginBottom: 2,
   },
-  small: {
-    textAlign: 'center',
-    color: THEME_COLORS.secondary,
-    fontSize: 20,
+  pageSubtitle: {
+    fontSize: 18,
+    color: c.subtitle,
   },
-  info: {
-    flex: 20,
-    padding: 10,
-    backgroundColor: THEME_COLORS.white,
-    borderRadius: 10,
+  infoRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  infoCard: {
+    flex: 1,
+    backgroundColor: c.surface,
+    borderRadius: 14,
+    padding: 16,
+    shadowColor: c.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  infoValue: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: c.tint,
+    marginBottom: 4,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: c.subtitle,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
   },
   tab: {
     flex: 1,
-    padding: 10,
-    borderRadius: 10,
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: c.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabActive: {
+    backgroundColor: c.tint,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: c.subtitle,
+  },
+  tabTextActive: {
+    color: c.onPrimary,
+  },
+  listShell: {
+    flex: 1,
   },
   item: {
-    flex: 1,
-    backgroundColor: THEME_COLORS.white,
-    marginBottom: 10,
-    borderRadius: 10,
+    backgroundColor: c.surface,
+    marginBottom: 12,
+    borderRadius: 14,
     overflow: 'hidden',
+    shadowColor: c.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   mountainImage: {
     width: '100%',
-    height: 140,
+    height: 168,
+  },
+  emptyImageText: {
+    color: c.subtitle,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  itemHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  itemTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: c.heading,
+  },
+  itemBody: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  itemSubtitle: {
+    fontSize: 15,
+    color: c.subtitle,
+    marginBottom: 4,
+  },
+  itemMeta: {
+    fontSize: 14,
+    color: c.icon,
+  },
+  emptyCard: {
+    padding: 20,
+  },
+  emptyStateText: {
+    fontSize: 15,
+    color: c.icon,
   },
 });
 

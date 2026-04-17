@@ -1,7 +1,9 @@
-import { THEME_COLORS } from "@/constants/api";
+import { Colors } from "@/constants/theme";
 import { useCallback, useEffect, useState } from "react";
-import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, Pressable, StyleSheet, Text, View } from "react-native";
 import { Mountain } from "../(tabs)/mountains";
+
+const c = Colors.light;
 
 function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 
@@ -67,18 +69,18 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
     };
 
     return(
-        <View style={{flex: 1, margin: 10}}>
-            {mountain !== null && <View style={{flex: 1, flexDirection: "row", paddingBottom: 10}}>
-                <TouchableOpacity style={[{flex: 1}, styles.button]} onPress={() => {back()}}>
-                    <Text style={{color: THEME_COLORS.white}}>
+        <View style={styles.screen}>
+            {mountain !== null && <View style={styles.topRow}>
+                <Pressable style={styles.button} onPress={() => {back()}}>
+                    <Text style={styles.buttonText}>
                         {"Back"}
                     </Text>
-                </TouchableOpacity>
-                <Text style={[{flex: 7}, styles.label]}>
+                </Pressable>
+                <Text style={styles.pageTitle}>
                     {mountain.name}
                 </Text>
             </View>}
-            <View style={{flex: 4}}>
+            <View style={styles.galleryShell}>
                 <FlatList
                     horizontal
                     snapToAlignment="start"
@@ -87,14 +89,17 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                     renderItem={mountainImage}
                     viewabilityConfig={viewabilityConfig}
                     onViewableItemsChanged={onViewableItemsChanged}
-                    style={{borderRadius: 10}}
+                    style={styles.carousel}
                 />
-                <Text>
+                <Text style={styles.indexLabel}>
                     {visibleIndex + 1}
                 </Text>
             </View>
-            {mountain !== null && <View style={{flex: 3}}>
-                <Text style={styles.small}>
+            {mountain !== null && <View style={styles.detailCard}>
+                <Text style={styles.pageSubtitle}>
+                    Mountain details
+                </Text>
+                <Text style={styles.bodyText}>
                     {mountain.description}
                 </Text>
             </View>}
@@ -105,23 +110,77 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 const width = Dimensions.get('screen').width;
 
 const styles = StyleSheet.create({
-    label: {
-        fontSize: 44,
+    screen: {
+        flex: 1,
+        backgroundColor: c.background,
+        padding: 16,
     },
-    small: {
-        color: THEME_COLORS.secondary,
-        fontSize: 20,
+    topRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 16,
+    },
+    pageTitle: {
+        flex: 1,
+        fontSize: 44,
+        fontWeight: "700",
+        color: c.heading,
+    },
+    pageSubtitle: {
+        fontSize: 28,
+        fontWeight: "700",
+        color: c.heading,
+        marginBottom: 10,
+    },
+    bodyText: {
+        fontSize: 15,
+        lineHeight: 22,
+        color: c.subtitle,
+    },
+    galleryShell: {
+        flex: 1,
+        marginBottom: 16,
+    },
+    carousel: {
+        borderRadius: 14,
     },
     img: {
         width: width,
         height: width,
         resizeMode: 'cover',
+        borderRadius: 14,
+    },
+    indexLabel: {
+        fontSize: 14,
+        color: c.icon,
+        marginTop: 10,
+        textAlign: "center",
     },
     button: {
-        padding: 10,
+        minWidth: 76,
+        minHeight: 42,
+        paddingHorizontal: 14,
         borderRadius: 10,
-        backgroundColor: THEME_COLORS.accent
-    }
+        backgroundColor: c.tint,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    buttonText: {
+        color: c.onPrimary,
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    detailCard: {
+        backgroundColor: c.surface,
+        borderRadius: 14,
+        padding: 14,
+        shadowColor: c.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
+    },
 });
 
 export default MountainsGallery

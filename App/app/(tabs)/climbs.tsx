@@ -1,13 +1,26 @@
-import { apiFetch } from "@/components/apiFetch";
-import { MOUNTAINS_URL, PROGRESS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getConnection } from "../_layout";
 
 const c = Colors.light;
+
+const db = getConnection();
+
+let isDbBusy = false;
+
+const runDbSafe = async (fn: () => Promise<void>) => {
+  if (isDbBusy) return;
+  isDbBusy = true;
+  try {
+    await fn();
+  } finally {
+    isDbBusy = false;
+  }
+};
 
 type Mountain = {
   id: string;
@@ -18,91 +31,48 @@ type Mountain = {
 };
 
 type InProgressMountain = Mountain & {
+  id: string;
+  mountainId: string;
   progressFt: number;
   isPaused: boolean;
 };
 
-type ProgressClimbRecord = {
-  climb_uuid: string;
+type LocalClimbRecord = {
+  id: string;
   mountain_id: string;
+  elevation: number;
+  is_active: number;
+  name: string;
+  location: string;
   height: number;
-  status?: "active" | "inactive" | "complete";
-  group: string | null;
 };
-
-type MountainDetail = {
-  uuid: string;
-  name?: string;
-  location?: string;
-  height?: number;
-};
-
-const initialInProgressMountains: InProgressMountain[] = [
-  {
-    id: "elbert",
-    name: "Mt. Elbert",
-    range: "Colorado, USA",
-    elevationFt: 14440,
-    group: null,
-    progressFt: 4520,
-    isPaused: false,
-  },
-];
 
 function Climbs() {
-  const { userId, logOut } = useAuth();
+  const { userId } = useAuth();
   const [isSelectingMountain, setIsSelectingMountain] = useState(false);
   const [availableMountains, setAvailableMountains] = useState<Mountain[]>([]);
-  const [inProgressMountains, setInProgressMountains] = useState(initialInProgressMountains);
+  const [inProgressMountains, setInProgressMountains] = useState<InProgressMountain[]>([]);
   const [isLoadingAvailableClimbs, setIsLoadingAvailableClimbs] = useState(false);
   const [availableClimbsError, setAvailableClimbsError] = useState<string | null>(null);
-  const activeClimbs = useMemo(
-    () => inProgressMountains.filter((mountain) => !mountain.isPaused),
-    [inProgressMountains]
-  );
+  const activeClimbs = useMemo(() => {
+    const unique = new Map<string, InProgressMountain>();
+    inProgressMountains.forEach((mountain) => {
+      if (!mountain.isPaused && !unique.has(mountain.id)) {
+        unique.set(mountain.id, mountain);
+      }
+    });
+    return Array.from(unique.values());
+  }, [inProgressMountains]);
 
   const sortedInProgress = useMemo(
-    () => [...inProgressMountains].sort((a, b) => b.progressFt / b.elevationFt - a.progressFt / a.elevationFt),
-    [inProgressMountains]
+    () => [...activeClimbs].sort((a, b) => b.progressFt / b.elevationFt - a.progressFt / a.elevationFt),
+    [activeClimbs]
   );
 
-  async function getUserClimbs(userId: string): Promise<ProgressClimbRecord[]> {
-    const response = await apiFetch(`${PROGRESS_URL}/progress/user/${userId}`);
-
-    if (response.status === 401) {
-      await logOut();
-      router.replace("/login");
-      return [];
-    }
-
-    if (response.status === 404) {
-      return [];
-    }
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch climbs: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
-  async function getMountainDetail(mountainId: string): Promise<MountainDetail | null> {
-    const response = await apiFetch(`${MOUNTAINS_URL}/mountains/${mountainId}`);
-
-    if (response.status === 404) {
-      return null;
-    }
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch mountain ${mountainId}: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
-  const loadAvailableClimbs = useCallback(async () => {
+  const loadClimbsFromDbInternal = useCallback(async () => {
     if (!userId) {
       setAvailableMountains([]);
+      setInProgressMountains([]);
       setAvailableClimbsError(null);
       return;
     }
@@ -111,80 +81,158 @@ function Climbs() {
     setAvailableClimbsError(null);
 
     try {
-      const climbs = await getUserClimbs(userId);
+      const database = await db;
+      const availableRows = await database.getAllAsync(`
+        SELECT m.id, m.name, m.location, m.height
+        FROM mountains m
+        LEFT JOIN climbs c ON c.mountain_id = m.id
+        WHERE c.mountain_id IS NULL AND COALESCE(m.summited, 0) = 0
+        ORDER BY m.name ASC
+      `) as { id: string; name: string; location: string; height: number }[];
+      const inProgressRows = await database.getAllAsync(`
+        SELECT c.id, c.mountain_id, c.elevation, c.is_active, m.name, m.location, m.height, m.summited
+        FROM climbs c
+        INNER JOIN mountains m ON m.id = c.mountain_id
+        WHERE COALESCE(m.summited, 0) = 0
+        ORDER BY m.name ASC
+      `) as LocalClimbRecord[];
 
-      const mountains = await Promise.all(
-        climbs.map(async (climb) => {
-          const detail = await getMountainDetail(climb.mountain_id);
-
-          return {
-            id: climb.climb_uuid,
-            name: detail?.name ?? `Mountain ${climb.mountain_id.slice(0, 8)}`,
-            range: detail?.location ?? "Unknown location",
-            elevationFt: Math.round(Number(detail?.height ?? climb.height ?? 0)),
-            group: climb.group,
-          };
-        })
+      setAvailableMountains(
+        availableRows.map((mountain) => ({
+          id: mountain.id,
+          name: mountain.name,
+          range: mountain.location ?? "Unknown location",
+          elevationFt: Math.round(Number(mountain.height ?? 0)),
+          group: null,
+        }))
       );
 
-      const inProgressIds = new Set(inProgressMountains.map((mountain) => mountain.id));
-      setAvailableMountains(mountains.filter((mountain) => !inProgressIds.has(mountain.id)));
+      setInProgressMountains(
+        inProgressRows.map((climb) => ({
+          id: climb.id,
+          mountainId: climb.mountain_id,
+          name: climb.name,
+          range: climb.location ?? "Unknown location",
+          elevationFt: Math.round(Number(climb.height ?? 0)),
+          group: null,
+          progressFt: Math.round(Number(climb.elevation ?? 0)),
+          isPaused: !Boolean(climb.is_active),
+        }))
+      );
     } catch (error) {
       console.log("Failed to load available climbs:", error);
       setAvailableClimbsError("Could not load climbs right now.");
       setAvailableMountains([]);
+      setInProgressMountains([]);
     } finally {
       setIsLoadingAvailableClimbs(false);
     }
-  }, [inProgressMountains, userId]);
+  }, [userId]);
+
+  const loadClimbsFromDb = useCallback(async () => {
+    await runDbSafe(loadClimbsFromDbInternal);
+  }, [loadClimbsFromDbInternal]);
 
   useFocusEffect(
     useCallback(() => {
-      loadAvailableClimbs();
-    }, [loadAvailableClimbs])
+      loadClimbsFromDb();
+    }, [loadClimbsFromDb])
   );
 
-  const startClimb = (mountain: Mountain) => {
-    setAvailableMountains((current) => current.filter((item) => item.id !== mountain.id));
-    setInProgressMountains((current) => [...current, { ...mountain, progressFt: 0, isPaused: false }]);
-    setIsSelectingMountain(false);
-  };
+  const startClimb = async (mountain: Mountain) => {
+    return runDbSafe(async () => {
+      try {
+        const database = await db;
+        const timestamp = Date.now();
+        const randomSuffix = Math.random().toString(36).slice(2, 10);
+        const climbId = `${mountain.id}-${timestamp}-${randomSuffix}`;
 
-  const togglePause = (mountainId: string) => {
-    const targetMountain = inProgressMountains.find((mountain) => mountain.id === mountainId);
-    if (!targetMountain) {
-      return;
-    }
+        await database.runAsync(
+          `INSERT INTO climbs (id, mountain_id, elevation, is_active)
+           VALUES (?, ?, ?, ?)`,
+          [climbId, mountain.id, 0, true]
+        );
 
-    setInProgressMountains((current) =>
-      current.map((mountain) =>
-        mountain.id === mountainId ? { ...mountain, isPaused: !targetMountain.isPaused } : mountain
-      )
-    );
-  };
+        await database.runAsync(
+          `INSERT INTO times (time, climb_id, is_start)
+           VALUES (?, ?, ?)`,
+          [timestamp, climbId, true]
+        );
 
-  const quitClimb = (mountainId: string) => {
-    setInProgressMountains((current) => {
-      const mountainToQuit = current.find((mountain) => mountain.id === mountainId);
-      if (!mountainToQuit) {
-        return current;
+        await loadClimbsFromDbInternal();
+        setIsSelectingMountain(false);
+      } catch (error) {
+        console.log("Failed to start climb:", error);
+        Alert.alert("Could not start climb", "Please try again.");
       }
-
-      setAvailableMountains((available) => {
-        if (available.some((mountain) => mountain.id === mountainToQuit.id)) {
-          return available;
-        }
-        return [...available, mountainToQuit];
-      });
-
-      return current.filter((mountain) => mountain.id !== mountainId);
     });
   };
 
-  const resetClimbProgress = (mountainId: string) => {
-    setInProgressMountains((current) =>
-      current.map((mountain) => (mountain.id === mountainId ? { ...mountain, progressFt: 0 } : mountain))
-    );
+  const togglePause = async (climbId: string) => {
+    return runDbSafe(async () => {
+      const targetMountain = inProgressMountains.find((mountain) => mountain.id === climbId);
+      if (!targetMountain) {
+        return;
+      }
+
+      try {
+        const database = await db;
+        await database.runAsync(`
+          UPDATE climbs
+          SET is_active = ?
+          WHERE id = ?
+        `, [targetMountain.isPaused, climbId]);
+
+        await database.runAsync(`
+          INSERT INTO times (time, climb_id, is_start)
+          VALUES (?, ?, ?)
+        `, [Date.now(), climbId, targetMountain.isPaused]);
+
+        await loadClimbsFromDbInternal();
+      } catch (error) {
+        console.log("Failed to update climb state:", error);
+        Alert.alert("Could not update climb", "Please try again.");
+      }
+    });
+  };
+
+  const quitClimb = async (climbId: string) => {
+    return runDbSafe(async () => {
+      try {
+        const database = await db;
+        await database.runAsync(
+          'DELETE FROM climbs WHERE id = ?',
+          [climbId]
+        );
+
+        await database.runAsync(
+          `DELETE FROM times WHERE climb_id = ?`,
+          [climbId]
+        );
+
+        await loadClimbsFromDbInternal();
+      } catch (error) {
+        console.log("Failed to quit climb:", error);
+        Alert.alert("Could not quit climb", "Please try again.");
+      }
+    });
+  };
+
+  const resetClimbProgress = async (climbId: string) => {
+    return runDbSafe(async () => {
+      try {
+        const database = await db;
+        await database.runAsync(
+          `UPDATE climbs SET elevation = 0 WHERE id = ?`,
+          [climbId]
+        );
+
+        await loadClimbsFromDbInternal();
+      } catch (error) {
+        console.log("Failed to reset climb progress:", error);
+        Alert.alert("Could not reset progress", "Please try again.");
+      }
+    });
   };
 
   const confirmQuitClimb = (mountain: InProgressMountain) => {
@@ -254,7 +302,7 @@ function Climbs() {
                   </View>
                   <Pressable
                     style={styles.cardPrimaryButton}
-                    onPress={() => startClimb(mountain)}
+                    onPress={() => { void startClimb(mountain); }}
                   >
                     <Text style={styles.cardPrimaryButtonText}>Start Climb</Text>
                   </Pressable>
@@ -269,11 +317,11 @@ function Climbs() {
           {sortedInProgress.length === 0 ? (
             <Text style={styles.emptyStateText}>No climbs in progress.</Text>
           ) : (
-            sortedInProgress.map((mountain) => {
+            sortedInProgress.map((mountain, index) => {
               const progressRatio = Math.min(mountain.progressFt / mountain.elevationFt, 1);
               const progressPct = Math.round(progressRatio * 100);
               return (
-                <View key={mountain.id} style={styles.card}>
+                <View key={`${mountain.id}-${index}`} style={styles.card}>
                   <Text style={styles.climbTypeLabel}>{mountain.group ?? "Individual climb"}</Text>
                   <Text style={styles.cardTitle}>{mountain.name}</Text>
                   <Text style={styles.cardSubtitle}>{mountain.range}</Text>
@@ -287,7 +335,7 @@ function Climbs() {
                   </View>
 
                   <View style={styles.actionsRow}>
-                    <Pressable style={styles.cardSecondaryButton} onPress={() => togglePause(mountain.id)}>
+                    <Pressable style={styles.cardSecondaryButton} onPress={() => { void togglePause(mountain.id); }}>
                       <Text style={styles.cardSecondaryButtonText}>
                         {mountain.isPaused ? "Resume Climb" : "Pause Climb"}
                       </Text>

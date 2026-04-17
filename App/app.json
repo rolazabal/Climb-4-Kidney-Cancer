@@ -1,77 +1,31 @@
 {
   "expo": {
-    "name": "SummitSteps",
-    "slug": "SummitSteps",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "summitsteps",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.SummitSteps"
-    },
-    "android": {
-      "package": "com.anonymous.App"
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Track your climbing progress using Health data",
+        "NSHealthUpdateUsageDescription": "Update climbing stats based on activity",
+        "UIBackgroundModes": [
+          "processing",
+          "processing"
+        ]
+      },
+      "bundleIdentifier": "com.anonymous.summitsteps"
     },
     "plugins": [
-      "expo-router",
       [
-        "expo-splash-screen",
+        "react-native-health",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
+          "permissions": {
+            "read": [
+              "FlightsClimbed"
+            ],
+            "write": []
           }
         }
-      ],
-      "expo-background-task",
-      "expo-sqlite",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "compileSdkVersion": 36,
-            "targetSdkVersion": 36,
-            "minSdkVersion": 26
-          }
-        }
-      ],
-      "expo-health-connect",
-      "expo-secure-store"
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
-    "expo": {
-      "ios": {
-        "infoPlist": {
-          "NSHealthShareUsageDescription": "Track your climbing progress using Health data",
-          "NSHealthUpdateUsageDescription": "Update climbing stats based on activity"
-        }
-      },
-      "plugins": [
-        [
-          "react-native-health",
-          {
-            "permissions": {
-              "read": [
-                "FlightsClimbed"
-              ],
-              "write": []
-            }
-          }
-        ]
       ]
+    ],
+    "android": {
+      "package": "com.anonymous.summitsteps"
     }
   }
 }

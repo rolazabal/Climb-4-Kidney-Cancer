@@ -1,128 +1,104 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { DeviceType, insertRecords, readRecords, RecordingMethod } from 'react-native-health-connect';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from '@/constants/theme';
+import { addSampleElevation, getHealthData, HealthProvider } from '@/lib/healthData';
 
-const theme = {
-    primary: 'rgb(51, 51, 51)',
-    secondary: 'rgb(102, 102, 101)',
-    accent: 'rgb(205, 88, 56)',
-    accentDark: 'rgb(185, 68, 36)',
-    background: '#F9FAFB',
-    white: '#FFFFFF',
-};
+const c = Colors.light;
 
 function Progress() {
-
     const [elevation, setElevation] = useState(0);
-
-    var lastDate = new Date();
+    const [provider, setProvider] = useState<HealthProvider>('unsupported');
+    const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
     async function getProgress() {
-        console.log("Getting progress");
-
-        let endDate = new Date();
-        let startDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDay());
-
-        console.log(startDate);
-
-        const { records } = await readRecords('ElevationGained', {
-            timeRangeFilter: {
-                operator: 'between',
-                startTime: startDate.toISOString(),
-                endTime: endDate.toISOString()
-            }
-        });
-
-        //console.log(records);
-
-        if (records.length < 1) {
-            return;
-        }
-
-        let elevation = 0;
-
-        records.forEach((record) => {
-            elevation += record.elevation.inFeet;
-        });
-
-        setElevation(elevation);
+        const result = await getHealthData();
+        setElevation(result.elevationFt);
+        setProvider(result.provider);
+        setStatusMessage(result.permissionGranted ? null : result.message ?? "Health data permission was denied.");
     }
 
     async function recordProgress() {
-        console.log("Recording progress");
+        const result = await addSampleElevation(10);
+        setElevation(result.elevationFt);
+        setProvider(result.provider);
+        setStatusMessage(result.permissionGranted ? null : result.message ?? "Unable to update health data.");
 
-        let date = new Date();
-
-        let ids = await insertRecords([
-            {
-                recordType: 'ElevationGained',
-                elevation: {unit: 'feet', value: 10},
-                startTime: lastDate.toISOString(),
-                endTime: date.toISOString(),
-                metadata: {
-                    recordingMethod: RecordingMethod.RECORDING_METHOD_AUTOMATICALLY_RECORDED,
-                    device: {
-                        manufacturer: 'Google',
-                        model: 'Pixel 9',
-                        type: DeviceType.TYPE_PHONE,
-                    },
-                }
-            }
-        ]);
-
-        lastDate = date;
-
-        console.log(ids);
-
-        await getProgress();
+        if (result.provider !== 'health-connect') {
+            Alert.alert(
+                "Read-only on this device",
+                "Sample health writes are only available through Health Connect on Android. iOS will still read Apple Health data."
+            );
+            return;
+        }
     }
 
     useFocusEffect(useCallback(() => {
         getProgress();
     }, []));
 
+    const providerLabel =
+        provider === 'health-connect'
+            ? 'Health Connect'
+            : provider === 'healthkit'
+              ? 'Apple Health'
+              : 'Health data';
+
     return (
-        <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
-            <TouchableOpacity onPress={() => {recordProgress()}}>
-                <Text>
-                    Register 10 ft
-                </Text>
-            </TouchableOpacity>
-            <View style={{flex: 2}}>
-                <Text style={styles.label}>
+        <SafeAreaView style={styles.screen} edges={["top"]}>
+            <View style={styles.content}>
+                <Pressable style={styles.startButton} onPress={() => {recordProgress()}}>
+                    <Text style={styles.startButtonText}>
+                        Register 10 ft
+                    </Text>
+                </Pressable>
+
+                <Text style={styles.pageTitle}>
                     Progress
                 </Text>
-                <Text style={styles.small}>
-                    Track your progress
+                <Text style={styles.pageSubtitle}>
+                    Track your progress and stay consistent.
                 </Text>
-            </View>
-            <View style={{flex: 8}}>
-                <View style={styles.card}>
-                    <View style={styles.card_head}>
-                        <Text style={styles.card_head_text}>
-                            Activity
-                        </Text>
-                    </View>
-                    <View style={{flex: 3, padding: 50}}>
-                        <Text style={[styles.label, {color: theme.accent}]}>
-                            {elevation}
-                        </Text>
-                        <Text style={styles.small}>
-                            ft climbed today
-                        </Text>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Today</Text>
+                    <View style={styles.card}>
+                        <View style={styles.metricPanel}>
+                            <Text style={styles.metricValue}>
+                                {Math.round(elevation)}
+                            </Text>
+                            <Text style={styles.metricLabel}>
+                                ft climbed today
+                            </Text>
+                        </View>
                     </View>
                 </View>
-                <View style={styles.card}>
-                    <View style={styles.card_head}>
-                        <Text style={styles.card_head_text}>
-                            Daily Quest
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Activity</Text>
+                    <View style={styles.card}>
+                        <Text style={styles.cardTitle}>{providerLabel}</Text>
+                        <Text style={styles.cardSubtitle}>
+                            {provider === 'healthkit'
+                                ? 'Your elevation total is estimated from Apple Health flights climbed data.'
+                                : 'Your elevation total is pulled from recorded `ElevationGained` entries.'}
                         </Text>
+                        <Text style={styles.cardMeta}>
+                            Total tracked today: {Math.round(elevation).toLocaleString()} ft
+                        </Text>
+                        {statusMessage ? (
+                            <Text style={styles.statusText}>{statusMessage}</Text>
+                        ) : null}
                     </View>
-                    <View style={{flex: 3, padding: 50}}>
-                        <Text style={styles.small}>
-                            Some quest info
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Daily Quest</Text>
+                    <View style={styles.card}>
+                        <Text style={styles.cardTitle}>Climb 500 ft today</Text>
+                        <Text style={styles.cardSubtitle}>
+                            Keep your momentum going with a short stair, hill, or incline session.
                         </Text>
                     </View>
                 </View>
@@ -132,39 +108,99 @@ function Progress() {
 }
 
 const styles = StyleSheet.create({
-    label: {
-        textAlign: 'center',
+    screen: {
+        flex: 1,
+        backgroundColor: c.background,
+    },
+    content: {
+        flex: 1,
+        padding: 16,
+        paddingBottom: 32,
+    },
+    pageTitle: {
         fontSize: 44,
+        fontWeight: '700',
+        color: c.heading,
+        marginBottom: 2,
     },
-    small: {
-        textAlign: 'center',
-        color: theme.secondary,
-        fontSize: 20,
+    pageSubtitle: {
+        fontSize: 18,
+        color: c.subtitle,
+        marginBottom: 16,
     },
-    info: {
-        flex: 20,
-        padding: 10,
-        backgroundColor: theme.white,
-        borderRadius: 10,
-
+    startButton: {
+        backgroundColor: c.tint,
+        borderRadius: 14,
+        minHeight: 56,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    startButtonText: {
+        color: c.onPrimary,
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    section: {
+        marginBottom: 20,
+    },
+    sectionTitle: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: c.heading,
+        marginBottom: 12,
     },
     card: {
-        flex: 1,
-        backgroundColor: theme.white,
-        marginBottom: 10,
-        borderRadius: 10,
+        backgroundColor: c.surface,
+        borderRadius: 14,
+        padding: 14,
+        shadowColor: c.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    card_head: {
-        flex: 1,
-        padding: 10,
-        backgroundColor: theme.primary,
-        borderTopStartRadius: 10,
-        borderTopEndRadius: 10,
+    metricPanel: {
+        minHeight: 168,
+        borderRadius: 12,
+        backgroundColor: c.surfaceMuted,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
     },
-    card_head_text: {
-        fontSize: 24,
-        color: theme.white,
-    }
+    metricValue: {
+        fontSize: 44,
+        fontWeight: '700',
+        color: c.tint,
+        marginBottom: 8,
+    },
+    metricLabel: {
+        fontSize: 18,
+        color: c.subtitle,
+        textAlign: 'center',
+    },
+    cardTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: c.heading,
+        marginBottom: 4,
+    },
+    cardSubtitle: {
+        fontSize: 15,
+        color: c.subtitle,
+        lineHeight: 22,
+    },
+    cardMeta: {
+        fontSize: 14,
+        color: c.icon,
+        marginTop: 10,
+    },
+    statusText: {
+        fontSize: 14,
+        color: c.error,
+        marginTop: 10,
+        lineHeight: 20,
+    },
 });
 
 export default Progress;

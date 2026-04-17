@@ -7,9 +7,10 @@ import * as SQLite from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import * as TaskManager from 'expo-task-manager';
 import { useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
-import { initialize, readRecords, requestPermission } from 'react-native-health-connect';
+import { AppState, Platform } from 'react-native';
 import 'react-native-reanimated';
+
+let connectionPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -20,7 +21,11 @@ function RootLayout() {
 
   // permissions
   async function getPermissions() {
-    await requestPermission([
+    if (Platform.OS !== 'android') {
+      return;
+    }
+    const healthConnect = await import('react-native-health-connect');
+    await healthConnect.requestPermission([
       {
         accessType: 'read',
         recordType: 'BackgroundAccessPermission'
@@ -63,19 +68,31 @@ function RootLayout() {
   TaskManager.defineTask(DATA_TASK_ID, async () => {
     console.log("Executing task");
     try {
+      if (Platform.OS !== 'android') {
+        return BackgroundTask.BackgroundTaskResult.Success;
+      }
+
+      const healthConnect = await import('react-native-health-connect');
+
       // get current time
       let date = new Date();
 
       let db = await getConnection();
       // these rows need to be deleted upon being read
-      let rows = await db.getAllAsync('SELECT * from times');
+      type TimeRow = {
+        time: number;
+        climb_id: string;
+        is_start: number; // SQLite stores booleans as 0/1
+      };
+
+      let rows = await db.getAllAsync<TimeRow>('SELECT * from times');
       
       let ranges = new Array();
       let activeClimbs = new Array();
       let lastDate = new Date();
 
       // process historic climb data ==========================================
-      rows.forEach((row) => {
+      rows.forEach((row: TimeRow) => {
         // get time
         let curDate = new Date(row.time);
 
@@ -90,7 +107,7 @@ function RootLayout() {
 
         lastDate = curDate;
 
-        if (row.is_start) {
+        if (row.is_start === 1) {
           // add new climb to active climbs
           activeClimbs.push(row.climb_id);
         } else {
@@ -108,7 +125,7 @@ function RootLayout() {
 
       // get health data from ranges
       let recordPromises = ranges.map((range) =>
-        readRecords('ElevationGained', {
+        healthConnect.readRecords('ElevationGained', {
           timeRangeFilter: {
             operator: 'between',
             startTime: range.startTime,
@@ -125,7 +142,7 @@ function RootLayout() {
       // 1 check if any active climbs have completed
       //activeClimbs = summitClimbs(activeClimbs);
       // 2 get elevation data from lastDate to date
-      let { records } = await readRecords('ElevationGained', {
+      let { records } = await healthConnect.readRecords('ElevationGained', {
         timeRangeFilter: {
           operator: 'between',
           startTime: lastDate.toISOString(),
@@ -206,11 +223,15 @@ function RootLayout() {
 
   useEffect(() => {
     const initTask = async () => {
-      // initialize db, permissions, and background task
       await initializeDatabase();
-      initialize();
+
+      if (Platform.OS === 'android') {
+        const healthConnect = await import('react-native-health-connect');
+        await healthConnect.initialize();
+        await registerBackgroundTaskAsync();
+      }
+
       await getPermissions();
-      await registerBackgroundTaskAsync();
       await updateAsync();
     };
     console.log("Root Loaded!");
@@ -251,8 +272,10 @@ function RootLayout() {
 }
 
 export async function getConnection() {
-    let db = await SQLite.openDatabaseAsync("app", {useNewConnection: true});
-    return db;
+  if (!connectionPromise) {
+    connectionPromise = SQLite.openDatabaseAsync("app");
+  }
+  return connectionPromise;
 }
 
 export default RootLayout;
