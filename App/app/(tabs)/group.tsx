@@ -191,7 +191,14 @@ export default function GroupPage() {
           onPress={(event) => {
             event.stopPropagation();
             if (item.joined) {
-              leaveGroup(item.id);
+              Alert.alert('Leave group', `Leave ${item.name}?`, [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Leave',
+                  style: 'destructive',
+                  onPress: () => leaveGroup(item.id),
+                },
+              ]);
             } else {
               joinGroup(item.id);
             }
