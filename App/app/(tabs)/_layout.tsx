@@ -4,7 +4,7 @@ import React from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Map, Mountain as MountainIcon, TrendingUp, User } from 'lucide-react-native';
+import { Map, Mountain as MountainIcon, TrendingUp, User, Settings, UserRoundSearch } from 'lucide-react-native';
 import { Text, TextProps } from 'react-native';
 
 import { THEME_COLORS } from '@/constants/api';
@@ -28,28 +28,42 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+        name="mountains"
+        options={{
+          title: 'Mountains',
+          tabBarIcon: ({ color }) => <Map color={color} size={24} />,
+        }}
+        />
+        <Tabs.Screen
           name="progress"
           options={{
             title: 'Progress',
-            tabBarIcon: ({ color }) => <TrendingUp color={THEME_COLORS.secondary} size={24} />,
+            tabBarIcon: ({ color }) => <TrendingUp color={color} size={24} />,
           }}
           />
-          <Tabs.Screen
-          name="mountains"
+        <Tabs.Screen
+          name="group"
           options={{
-            title: 'Mountains',
-            tabBarIcon: ({ color }) => <Map color={THEME_COLORS.secondary} size={24} />,
+            title: 'Groups',
+            tabBarIcon: ({ color }) => <UserRoundSearch color={color} size={24} />,
           }}
-          />
-          <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: ({ color }) => <User color={THEME_COLORS.secondary} size={24} />,
-          }}
-          />
-        </Tabs>
-      </>
+        />
+        <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <User color={color} size={24} />,
+        }}
+        />
+        <Tabs.Screen
+          name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color }) => <Settings color={color} size={24} />,
+        }}
+        />
+      </Tabs>
+    </>
   );
 }
 
@@ -58,7 +72,7 @@ export function AppText(props: TextProps) {
   return (
     <Text
       {...props}
-      style={[{ fontFamily: 'serif'}, props.style]}
+      style={[/*{ fontFamily: 'serif'},*/ props.style]}
     />
   );
 }

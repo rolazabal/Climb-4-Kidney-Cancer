@@ -1,8 +1,9 @@
+import { THEME_COLORS } from '@/constants/api';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { DeviceType, insertRecords, readRecords, RecordingMethod } from 'react-native-health-connect';
 import { SafeAreaView } from "react-native-safe-area-context";
-import { insertElevationRecord, readElevationRecords } from '@/lib/health';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
@@ -17,17 +18,24 @@ function Progress() {
 
     const [elevation, setElevation] = useState(0);
 
-    const lastDate = useRef(new Date());
+    var lastDate = new Date();
 
     async function getProgress() {
-        console.log("Getting progress");
+        //console.log("Getting progress");
 
         let endDate = new Date();
-        let startDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDay());
+        let startDate = new Date(endDate);
+        startDate.setUTCHours(0, 0, 0, 0);
 
-        console.log(startDate);
+        //console.log(startDate);
 
-        const { records } = await readElevationRecords(startDate.toISOString(), endDate.toISOString());
+        const { records } = await readRecords('ElevationGained', {
+            timeRangeFilter: {
+                operator: 'between',
+                startTime: startDate.toISOString(),
+                endTime: endDate.toISOString()
+            }
+        });
 
         //console.log(records);
 
@@ -44,18 +52,29 @@ function Progress() {
         setElevation(elevation);
     }
 
-    async function recordProgress() {
+    async function recordProgress(feet: number) {
         console.log("Recording progress");
 
         let date = new Date();
 
-        let ids = await insertElevationRecord({
-            startTime: lastDate.current.toISOString(),
-            endTime: date.toISOString(),
-            feet: 10,
-        });
+        let ids = await insertRecords([
+            {
+                recordType: 'ElevationGained',
+                elevation: {unit: 'feet', value: feet},
+                startTime: lastDate.toISOString(),
+                endTime: date.toISOString(),
+                metadata: {
+                    recordingMethod: RecordingMethod.RECORDING_METHOD_AUTOMATICALLY_RECORDED,
+                    device: {
+                        manufacturer: 'Google',
+                        model: 'Pixel 9',
+                        type: DeviceType.TYPE_PHONE,
+                    },
+                }
+            }
+        ]);
 
-        lastDate.current = date;
+        lastDate = date;
 
         console.log(ids);
 
@@ -68,32 +87,32 @@ function Progress() {
 
     return (
         <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
-            <TouchableOpacity onPress={() => {recordProgress()}}>
+            <TouchableOpacity onPress={() => {recordProgress(100)}}>
                 <Text>
-                    {Platform.OS === 'android' ? 'Register 10 ft' : 'Refresh Health Data'}
+                    Register 100 ft
                 </Text>
             </TouchableOpacity>
             <View style={{flex: 2}}>
-                <Text style={styles.label}>
+                <Text style={[styles.label, {color: THEME_COLORS.primary}]}>
                     Progress
                 </Text>
                 <Text style={styles.small}>
-                    Track your progress
+                    Track your progress.
                 </Text>
             </View>
-            <View style={{flex: 8}}>
+            <View style={{flex: 9}}>
                 <View style={styles.card}>
                     <View style={styles.card_head}>
                         <Text style={styles.card_head_text}>
-                            Activity
+                            Daily Activity
                         </Text>
                     </View>
                     <View style={{flex: 3, padding: 50}}>
                         <Text style={[styles.label, {color: theme.accent}]}>
-                            {elevation}
+                            {elevation} ft
                         </Text>
                         <Text style={styles.small}>
-                            ft climbed today
+                            climbed today
                         </Text>
                     </View>
                 </View>
@@ -105,7 +124,7 @@ function Progress() {
                     </View>
                     <View style={{flex: 3, padding: 50}}>
                         <Text style={styles.small}>
-                            Some quest info
+                            Climb 30 ft!
                         </Text>
                     </View>
                 </View>
@@ -134,15 +153,17 @@ const styles = StyleSheet.create({
     card: {
         flex: 1,
         backgroundColor: theme.white,
-        marginBottom: 10,
         borderRadius: 10,
+        justifyContent: 'center',
+        marginBottom: 10
     },
     card_head: {
         flex: 1,
-        padding: 10,
+        paddingHorizontal: 20,
         backgroundColor: theme.primary,
         borderTopStartRadius: 10,
         borderTopEndRadius: 10,
+        justifyContent: 'center'
     },
     card_head_text: {
         fontSize: 24,

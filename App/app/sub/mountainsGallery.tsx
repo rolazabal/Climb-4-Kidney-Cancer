@@ -1,7 +1,8 @@
-import { THEME_COLORS } from "@/constants/api";
-import { useCallback, useEffect, useState } from "react";
+import { MOUNTAINS_URL, THEME_COLORS } from "@/constants/api";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Mountain } from "../(tabs)/mountains";
+import { ChevronLeft } from "lucide-react-native";
 
 function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 
@@ -18,11 +19,12 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
     useEffect(() => {
     	// get mountain data
         const getMountain = async () => {
-            let res = await fetch('https://mountains-service-production.up.railway.app/mountains/' + id, {
+            let res = await fetch(MOUNTAINS_URL + '/' + id, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
             if (res.status !== 200) {
+                back();
                 console.log('Mountain fetch failed:', res.status);
                 return;
             }
@@ -31,7 +33,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
         };
         // get mountain images
         const getUrls = async() => {
-            let res = await fetch('https://mountains-service-production.up.railway.app/mountains/' + id + '/gallery', {
+            let res = await fetch(MOUNTAINS_URL + '/' + id + '/gallery', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -40,7 +42,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
             }
             let data = await res.json();
             setUrls(data.urls);
-            console.log(data.urls);
+            //console.log(data.urls);
         }
         if (id !== null && mountain === null) {
             getMountain();
@@ -48,6 +50,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
         }
     }, []);
 
+    // image picker stuff
     const [visibleIndex, setVisibleIndex] = useState(0);
 
     const onViewableItemsChanged = useCallback(({ viewableItems }) => {
@@ -63,23 +66,31 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 
     const viewabilityConfig = {
         viewAreaCoveragePercentThreshold: 90,
-        waitForInteraction: true,
+        waitForInteraction: false,
     };
+
+    const listRef = useRef<FlatList | null>(null);
+
+    function selectIndex(index: number) {
+        if (listRef.current === null) {
+            return;
+        }
+        listRef.current.scrollToOffset({offset: index * width, animated: true});
+    }
 
     return(
         <View style={{flex: 1, margin: 10}}>
             {mountain !== null && <View style={{flex: 1, flexDirection: "row", paddingBottom: 10}}>
-                <TouchableOpacity style={[{flex: 1}, styles.button]} onPress={() => {back()}}>
-                    <Text style={{color: THEME_COLORS.white}}>
-                        {"Back"}
-                    </Text>
+                <TouchableOpacity style={[styles.button]} onPress={() => {back()}}>
+                    <ChevronLeft size={30} color={THEME_COLORS.white} />
                 </TouchableOpacity>
-                <Text style={[{flex: 7}, styles.label]}>
+                <Text style={[{flex: 7, marginHorizontal: 10}, styles.label]}>
                     {mountain.name}
                 </Text>
             </View>}
-            <View style={{flex: 4}}>
+            <View style={{flex: 8}}>
                 <FlatList
+                    ref={listRef}
                     horizontal
                     snapToAlignment="start"
                     snapToInterval={width}
@@ -89,11 +100,13 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                     onViewableItemsChanged={onViewableItemsChanged}
                     style={{borderRadius: 10}}
                 />
-                <Text>
-                    {visibleIndex + 1}
-                </Text>
             </View>
-            {mountain !== null && <View style={{flex: 3}}>
+            <View style={{flex: 1, flexDirection: 'row', justifyContent: 'center'}}>
+                {urls?.map((url, index) => (
+                    <TouchableOpacity onPress={() => selectIndex(index)} style={[styles.radio, {backgroundColor: (visibleIndex !== index) ? THEME_COLORS.primary : THEME_COLORS.accent}]} key={index} />
+                ))}
+            </View>
+            {mountain !== null && <View style={{flex: 5}}>
                 <Text style={styles.small}>
                     {mountain.description}
                 </Text>
@@ -118,9 +131,18 @@ const styles = StyleSheet.create({
         resizeMode: 'cover',
     },
     button: {
+        width: 50,
+        height: 50,
+        borderRadius: '50%',
         padding: 10,
-        borderRadius: 10,
         backgroundColor: THEME_COLORS.accent
+    },
+    radio: {
+        width: 15,
+        height: 15,
+        alignItems: 'center',
+        margin: 10,
+        borderRadius: '50%',
     }
 });
 
