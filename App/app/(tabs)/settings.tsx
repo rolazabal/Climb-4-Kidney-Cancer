@@ -11,8 +11,24 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView as RNKeyboardAvoidingView,
 } from 'react-native';
-import { KeyboardAvoidingView as RNKeyboardAvoidingView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { User, Settings as SettingsIcon, Save, LogOut } from 'lucide-react-native';
+import { router } from 'expo-router';
+
+import { AppText } from './_layout';
+import { EditableField } from '@/components/EditableField';
+import { getProfile, updateProfile } from '@/Services/userService';
+import {
+  validateUsername,
+  validateEmail,
+  validateBio,
+} from '@/lib/validation';
+import { Colors } from '@/constants/theme';
+import { useAuth } from '@/context/auth';
+const c = Colors.light;
 
 const KeyboardAvoidingView = RNKeyboardAvoidingView as React.ComponentType<{
   style?: object;
@@ -20,26 +36,12 @@ const KeyboardAvoidingView = RNKeyboardAvoidingView as React.ComponentType<{
   keyboardVerticalOffset?: number;
   children?: React.ReactNode;
 }>;
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
-import { User, Settings as SettingsIcon, Save, LogOut } from 'lucide-react-native';
-
-import { AppText } from './_layout';
-import { EditableField } from '@/components/EditableField';
-import { getProfile, updateProfile, updatePassword } from '@/Services/userService';
-import {
-  validateUsername,
-  validateEmail,
-  validatePassword,
-  validateBio,
-} from '@/lib/validation';
-import { Colors } from '@/constants/theme';
-const c = Colors.light;
 
 //bio character limit
 const BIO_MAX = 150;
 
 export default function SettingsScreen() {
+  const { logOut } = useAuth();
   //fields
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -47,14 +49,9 @@ export default function SettingsScreen() {
   const [email, setEmail] = useState('');
   const [bio, setBio] = useState('');
   const [profilePictureUri, setProfilePictureUri] = useState<string | null>(null);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   //real-time validation errors
   const [usernameError, setUsernameError] = useState<string | undefined>();
   const [emailError, setEmailError] = useState<string | undefined>();
-  const [passwordError, setPasswordError] = useState<string | undefined>();
-  const [confirmPasswordError, setConfirmPasswordError] = useState<string | undefined>();
   const [bioError, setBioError] = useState<string | undefined>();
   //prevent multiple saves and show loading state
   const [isSaving, setIsSaving] = useState(false);
@@ -116,35 +113,12 @@ export default function SettingsScreen() {
       setEmailError(undefined);
     }
 
-    if (newPassword || currentPassword || confirmPassword) {
-      if (!currentPassword) {
-        setPasswordError('Enter your current password');
-        valid = false;
-      } else {
-        setPasswordError(undefined);
-      }
-      if (newPassword) {
-        const p = validatePassword(newPassword);
-        setPasswordError(p.error);
-        if (!p.valid) valid = false;
-      }
-      if (newPassword && confirmPassword !== newPassword) {
-        setConfirmPasswordError('Password does not match');
-        valid = false;
-      } else {
-        setConfirmPasswordError(undefined);
-      }
-    } else {
-      setPasswordError(undefined);
-      setConfirmPasswordError(undefined);
-    }
-
     const b = validateBio(bio);
     setBioError(b.error);
     if (!b.valid) valid = false;
 
     return valid;
-  }, [username, email, currentPassword, newPassword, confirmPassword, bio]);
+  }, [username, email, bio]);
   //change only when any field changes. (changes are valid)
   const hasEdits =
     firstName.trim() !== '' ||
@@ -152,10 +126,9 @@ export default function SettingsScreen() {
     username.trim() !== '' ||
     email.trim() !== '' ||
     bio.trim() !== '' ||
-    profilePictureUri !== null ||
-    newPassword !== '';
+    profilePictureUri !== null;
 
-  const canSave = hasEdits && !isSaving && !usernameError && !emailError && !passwordError && !confirmPasswordError && !bioError;
+  const canSave = hasEdits && !isSaving && !usernameError && !emailError && !bioError;
   //validate, send changed fields, and show success or error alert. stop load.
   const handleSave = useCallback(async () => {
     if (!canSave || isSaving) return;
@@ -178,34 +151,27 @@ export default function SettingsScreen() {
           return;
         }
       }
-      //update password.
-      if (newPassword && currentPassword) {
-        const pResult = await updatePassword(currentPassword, newPassword);
-        if (!pResult.success) {
-          Alert.alert('Error', pResult.error ?? 'Failed to update password');
-          return;
-        }
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setPasswordError(undefined);
-        setConfirmPasswordError(undefined);
-      }
-
       Alert.alert('Success', 'Your settings have been saved.');
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setIsSaving(false);
     }
-  }, [canSave, isSaving, runValidation, firstName, lastName, username, email, bio, profilePictureUri, newPassword, currentPassword]);
-  //backend not implemented yet. 
+  }, [canSave, isSaving, runValidation, firstName, lastName, username, email, bio, profilePictureUri]);
+
   const handleLogout = useCallback(() => {
     Alert.alert('Log out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => {} },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: async () => {
+          await logOut();
+          router.replace('/login');
+        },
+      },
     ]);
-  }, []);
+  }, [logOut]);
 
   if (isLoading) {
     return (
@@ -275,37 +241,6 @@ export default function SettingsScreen() {
               placeholder="Choose a username"
               error={usernameError}
               onBlur={() => username.trim() && setUsernameError(validateUsername(username).error)}
-            />
-
-            <AppText style={styles.sectionLabel}>Change Password:</AppText>
-            <EditableField
-              label="Current password"
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Enter current password"
-              secureTextEntry
-            />
-            <EditableField
-              label="New password"
-              value={newPassword}
-              onChangeText={(t) => {
-                setNewPassword(t);
-                if (passwordError) setPasswordError(validatePassword(t).error);
-              }}
-              placeholder="Min 8 characters, one number"
-              error={passwordError}
-              secureTextEntry
-            />
-            <EditableField
-              label="Confirm password"
-              value={confirmPassword}
-              onChangeText={(t) => {
-                setConfirmPassword(t);
-                if (confirmPasswordError && t === newPassword) setConfirmPasswordError(undefined);
-              }}
-              placeholder="Confirm new password"
-              error={confirmPasswordError}
-              secureTextEntry
             />
 
             <EditableField

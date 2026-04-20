@@ -23,7 +23,7 @@ function Mountains() {
     }, [viewID]);
 
     return(
-        <SafeAreaView style={{flex: 1}}>
+        <SafeAreaView style={{flex: 1, backgroundColor: '#ECEDEE'}} edges={['top','left', 'right']}>
             {state === States.Gallery && <MountainsGallery id={viewID} back={() => setViewID(null)} />}
             {state === States.List && <MountainsList view={(id: string) => {setViewID(id)}} />}
         </SafeAreaView>

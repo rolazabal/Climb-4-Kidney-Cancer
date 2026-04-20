@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, ScrollView} from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from '@/constants/theme';
 import { addSampleElevation, getHealthData, HealthProvider } from '@/lib/healthData';
@@ -47,6 +47,7 @@ function Progress() {
 
     return (
         <SafeAreaView style={styles.screen} edges={["top"]}>
+            <ScrollView>
             <View style={styles.content}>
                 <Pressable style={styles.startButton} onPress={() => {recordProgress()}}>
                     <Text style={styles.startButtonText}>
@@ -103,6 +104,7 @@ function Progress() {
                     </View>
                 </View>
             </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }

@@ -20,12 +20,13 @@ export default function TabLayout() {
           headerShown: false,
           tabBarButton: HapticTab,
           tabBarStyle: {
-            backgroundColor: palette.surface,
+            backgroundColor: palette.text,
             borderTopColor: palette.border,
           },
           tabBarLabelStyle: {
-            fontSize: 12,
+            fontSize: 10,
             fontWeight: '600',
+            //color: palette.text,
           },
         }}>
         <Tabs.Screen

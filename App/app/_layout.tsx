@@ -88,6 +88,7 @@ function RootLayout() {
       let rows = await db.getAllAsync<TimeRow>('SELECT * from times');
       
       let ranges = new Array();
+      // active climbs will be tracked in memory, with time ranges created for each unique set of active climbs
       let activeClimbs = new Array();
       let lastDate = new Date();
 

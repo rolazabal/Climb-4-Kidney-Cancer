@@ -9,7 +9,7 @@ import { getConnection } from "../_layout";
 const c = Colors.light;
 
 const db = getConnection();
-
+//solve satabse is locked error. 
 let isDbBusy = false;
 
 const runDbSafe = async (fn: () => Promise<void>) => {
@@ -55,6 +55,7 @@ function Climbs() {
   const [isLoadingAvailableClimbs, setIsLoadingAvailableClimbs] = useState(false);
   const [availableClimbsError, setAvailableClimbsError] = useState<string | null>(null);
   const activeClimbs = useMemo(() => {
+    //added map to filter out duplicate climbs. (multiple climbed active at once)
     const unique = new Map<string, InProgressMountain>();
     inProgressMountains.forEach((mountain) => {
       if (!mountain.isPaused && !unique.has(mountain.id)) {
@@ -63,8 +64,8 @@ function Climbs() {
     });
     return Array.from(unique.values());
   }, [inProgressMountains]);
-
-  const sortedInProgress = useMemo(
+  //filter data source, use active climbs instead of inProgressMountains
+    const sortedInProgress = useMemo(
     () => [...activeClimbs].sort((a, b) => b.progressFt / b.elevationFt - a.progressFt / a.elevationFt),
     [activeClimbs]
   );
@@ -144,6 +145,7 @@ function Climbs() {
       try {
         const database = await db;
         const timestamp = Date.now();
+        //add random suffix to climbs IDS when new climbs created
         const randomSuffix = Math.random().toString(36).slice(2, 10);
         const climbId = `${mountain.id}-${timestamp}-${randomSuffix}`;
 

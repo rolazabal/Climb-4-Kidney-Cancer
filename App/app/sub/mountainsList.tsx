@@ -1,14 +1,19 @@
 import { MOUNTAINS_URL } from '@/constants/api';
-import { useAuth } from '@/context/auth';
 import { apiFetch } from "@/components/apiFetch";
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Mountain } from '../(tabs)/mountains';
 import { getConnection } from '../_layout';
+import { useAuth } from '@/context/auth';
 import { Colors } from '@/constants/theme';
 
 const c = Colors.light;
+const Tabs = {
+  all: 0,
+  climbed: 1,
+  toClimb: 2,
+};
 
 function MountainsList({view}: {view: Function}) {
   const [mountains, setMountains] = useState<Mountain[]>([]);
@@ -16,12 +21,6 @@ function MountainsList({view}: {view: Function}) {
   const [activeMountains, setActiveMountains] = useState<Mountain[]>([]);
   const [peakNumber, setPeakNumber] = useState(0);
   const { logOut } = useAuth();
-
-  const Tabs = {
-    all: 0,
-    climbed: 1,
-    toClimb: 2,
-  };
 
   const [tab, setTab] = useState(Tabs.all);
 
@@ -32,8 +31,9 @@ function MountainsList({view}: {view: Function}) {
   const getMountains = useCallback(async () => {
     // check sync
     let db = await getConnection();
-    let row = await db.getFirstAsync('SELECT mountains FROM sync');
-    console.log(row);
+    await db.getFirstAsync('SELECT mountains FROM sync');
+    //console.log(row);
+
     try {
       // request mountain list
       let res = await apiFetch(MOUNTAINS_URL);
@@ -64,7 +64,7 @@ function MountainsList({view}: {view: Function}) {
         ...mountain,
         image_presigned_url: urls[index],
       }));
-      const mountainsById = new Map(mountains.map((mountain: Mountain) => [mountain.uuid, mountain]));
+      const mountainsById = new Map<string, Mountain>(mountains.map((mountain: Mountain) => [mountain.uuid, mountain]));
 
       setPeakNumber(mountains.length);
       setMountains(mountains);
@@ -72,9 +72,7 @@ function MountainsList({view}: {view: Function}) {
       // sync
       let statement = await db.prepareAsync('INSERT INTO mountains VALUES ($id, $name, $location, $height, $summited)');
       try {
-        for (let x in mountains) {
-          const key = x as keyof Mountain;
-          let mountain = mountains[key];
+        for (let mountain of mountains) {
           await statement.executeAsync({
             $id: mountain.uuid,
             $name: mountain.name,

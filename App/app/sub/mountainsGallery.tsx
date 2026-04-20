@@ -1,7 +1,9 @@
+import { MOUNTAINS_URL } from "@/constants/api";
 import { Colors } from "@/constants/theme";
-import { useCallback, useEffect, useState } from "react";
-import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BackHandler, Dimensions, FlatList, Image, ListRenderItemInfo, Pressable, StyleSheet, Text, View, ViewToken } from "react-native";
 import { Mountain } from "../(tabs)/mountains";
+import { ChevronLeft } from "lucide-react-native";
 
 const c = Colors.light;
 
@@ -9,18 +11,30 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 
     const [mountain, setMountain] = useState<Mountain | null>(null);
     const [urls, setUrls] = useState<string[] | null>(null);
+    const [visibleIndex, setVisibleIndex] = useState(0);
 
-    const subscription = BackHandler.addEventListener(
-        'hardwareBackPress',
-        function() {
-            back();
-        }
-    );
+    const handleBack = useCallback(() => {
+        back();
+        return true;
+    }, [back]);
 
     useEffect(() => {
+        const subscription = BackHandler.addEventListener('hardwareBackPress', handleBack);
+        return () => subscription.remove();
+    }, [handleBack]);
+
+    useEffect(() => {
+        if (id === null) {
+            return;
+        }
+
+        setMountain(null);
+        setUrls(null);
+        setVisibleIndex(0);
+
     	// get mountain data
         const getMountain = async () => {
-            let res = await fetch('https://mountains-service-production.up.railway.app/mountains/' + id, {
+            let res = await fetch(MOUNTAINS_URL + '/' + id, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -33,7 +47,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
         };
         // get mountain images
         const getUrls = async() => {
-            let res = await fetch('https://mountains-service-production.up.railway.app/mountains/' + id + '/gallery', {
+            let res = await fetch(MOUNTAINS_URL + '/' + id + '/gallery', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -42,22 +56,21 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
             }
             let data = await res.json();
             setUrls(data.urls);
-            console.log(data.urls);
+            //console.log(data.urls);
         }
-        if (id !== null && mountain === null) {
-            getMountain();
-            getUrls();
-        }
-    }, []);
+        getMountain();
+        getUrls();
+    }, [id]);
 
-    const [visibleIndex, setVisibleIndex] = useState(0);
-
-    const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+    const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
         if (viewableItems.length < 1) {
             return;
         }
-        setVisibleIndex(viewableItems[0].index);
-    }, []);
+        setVisibleIndex(viewableItems[0].index ?? 0);
+    },
+    []
+);
 
     const mountainImage = (info: ListRenderItemInfo<string>) => (
         <Image style={styles.img} source={{uri: info.item}} />
@@ -65,16 +78,23 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
 
     const viewabilityConfig = {
         viewAreaCoveragePercentThreshold: 90,
-        waitForInteraction: true,
+        waitForInteraction: false,
     };
+
+    const listRef = useRef<FlatList | null>(null);
+
+    function selectIndex(index: number) {
+        if (listRef.current === null) {
+            return;
+        }
+        listRef.current.scrollToOffset({offset: index * width, animated: true});
+    }
 
     return(
         <View style={styles.screen}>
             {mountain !== null && <View style={styles.topRow}>
                 <Pressable style={styles.button} onPress={() => {back()}}>
-                    <Text style={styles.buttonText}>
-                        {"Back"}
-                    </Text>
+                    <ChevronLeft size={24} color={c.onPrimary} />
                 </Pressable>
                 <Text style={styles.pageTitle}>
                     {mountain.name}
@@ -82,6 +102,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
             </View>}
             <View style={styles.galleryShell}>
                 <FlatList
+                    ref={listRef}
                     horizontal
                     snapToAlignment="start"
                     snapToInterval={width}
@@ -91,14 +112,14 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                     onViewableItemsChanged={onViewableItemsChanged}
                     style={styles.carousel}
                 />
-                <Text style={styles.indexLabel}>
-                    {visibleIndex + 1}
-                </Text>
+            </View>
+            <View style={styles.dotRow}>
+                {urls?.map((url, index) => (
+                    <Pressable onPress={() => selectIndex(index)} style={[styles.radio, visibleIndex === index && styles.radioActive]} key={index} />
+                ))}
             </View>
             {mountain !== null && <View style={styles.detailCard}>
-                <Text style={styles.pageSubtitle}>
-                    Mountain details
-                </Text>
+                <Text style={styles.sectionTitle}>Mountain details</Text>
                 <Text style={styles.bodyText}>
                     {mountain.description}
                 </Text>
@@ -127,20 +148,19 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         color: c.heading,
     },
-    pageSubtitle: {
+    sectionTitle: {
         fontSize: 28,
         fontWeight: "700",
         color: c.heading,
         marginBottom: 10,
     },
     bodyText: {
+        color: c.subtitle,
         fontSize: 15,
         lineHeight: 22,
-        color: c.subtitle,
     },
     galleryShell: {
-        flex: 1,
-        marginBottom: 16,
+        marginBottom: 12,
     },
     carousel: {
         borderRadius: 14,
@@ -151,25 +171,34 @@ const styles = StyleSheet.create({
         resizeMode: 'cover',
         borderRadius: 14,
     },
-    indexLabel: {
-        fontSize: 14,
-        color: c.icon,
-        marginTop: 10,
-        textAlign: "center",
-    },
     button: {
-        minWidth: 76,
-        minHeight: 42,
-        paddingHorizontal: 14,
-        borderRadius: 10,
-        backgroundColor: c.tint,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         alignItems: "center",
         justifyContent: "center",
+        backgroundColor: c.tint,
+        shadowColor: c.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    buttonText: {
-        color: c.onPrimary,
-        fontSize: 14,
-        fontWeight: "700",
+    dotRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    radio: {
+        width: 10,
+        height: 10,
+        alignItems: 'center',
+        margin: 6,
+        borderRadius: 5,
+        backgroundColor: c.surfaceMuted,
+    },
+    radioActive: {
+        backgroundColor: c.tint,
     },
     detailCard: {
         backgroundColor: c.surface,
