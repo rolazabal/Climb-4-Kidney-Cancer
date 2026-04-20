@@ -299,8 +299,8 @@ function Climbs() {
             ) : availableMountains.length === 0 ? (
               <Text style={styles.emptyStateText}>No mountains left to start right now.</Text>
             ) : (
-              availableMountains.map((mountain) => (
-                <View key={mountain.id} style={styles.card}>
+              availableMountains.map((mountain, index) => (
+                <View key={index} style={styles.card}>
                   <View>
                     <Text style={styles.climbTypeLabel}>{mountain.group ?? "Individual climb"}</Text>
                     <Text style={styles.cardTitle}>{mountain.name}</Text>
@@ -324,11 +324,11 @@ function Climbs() {
           {sortedInProgress.length === 0 ? (
             <Text style={styles.emptyStateText}>No climbs in progress.</Text>
           ) : (
-            sortedInProgress.map((mountain) => {
+            sortedInProgress.map((mountain, index) => {
               const progressRatio = Math.min(mountain.progressFt / mountain.elevationFt, 1);
               const progressPct = Math.round(progressRatio * 100);
               return (
-                <View key={mountain.id} style={styles.card}>
+                <View key={index} style={styles.card}>
                   <Text style={styles.climbTypeLabel}>{mountain.group ?? "Individual climb"}</Text>
                   <Text style={styles.cardTitle}>{mountain.name}</Text>
                   <Text style={styles.cardSubtitle}>{mountain.range}</Text>

@@ -82,6 +82,7 @@ function RootLayout() {
     await statement.finalizeAsync();
 
     rows = await db.getAllAsync('SELECT id FROM climbs WHERE is_active = true');
+    console.log(rows);
 
     let newIds = new Array();
 
@@ -174,6 +175,7 @@ function RootLayout() {
       // process currently active climbs ======================================
       // check if any active climbs have completed
       activeClimbs = await summitClimbs(activeClimbs);
+      console.log(activeClimbs);
 
       console.log("climbs were checked");
 
