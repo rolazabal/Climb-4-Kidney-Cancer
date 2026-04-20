@@ -48,7 +48,7 @@ function RootLayout() {
   async function assignElevationToClimbs(ids: string[], feet: number) {
     let distributed = feet / ids.length;
 
-    console.log("assign " + feet.toString() + " ft to these ids:");
+    console.log("assign " + distributed.toString() + " ft to these ids:");
     console.log(ids);
 
     let db = await getConnection();
@@ -77,6 +77,7 @@ function RootLayout() {
           height: row.elevation,
         }),
       });
+
       if (res.status !== 200) {
         // queue request
         console.log("error syncing mountain elevation");
@@ -95,7 +96,7 @@ function RootLayout() {
       ) RETURNING mountain_id
     `);
 
-    let statement = await db.prepareAsync("UPDATE mountains SET summited = true WHERE id = $id");
+    let statement = await db.prepareAsync('UPDATE mountains SET summited = true WHERE id = $id');
 
     for (const row of rows) {
       await statement.executeAsync({$id: row.id});
@@ -103,18 +104,31 @@ function RootLayout() {
     
     await statement.finalizeAsync();
 
-    rows = await db.getAllAsync('SELECT id FROM climbs WHERE is_active = true');
-    console.log(rows);
-
-    let newIds = new Array();
-
-    rows.forEach((row) => {
-      newIds.push(row.id);
-    });
+    let new_rows = await db.getAllAsync('SELECT id FROM climbs WHERE is_active = true');
 
     await db.closeAsync();
 
+    let newIds = new Array();
 
+    for (const row of new_rows) {
+      newIds.push(row.id);
+    }
+
+    // send summits to backend
+    for (const row of rows) {
+      let res = await fetch(PROGRESS_URL + '/update/' + row.id, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          status: 'complete'
+        })
+      });
+
+      if (res.status !== 200) {
+        // queue request
+        console.log("error registering summit with backend")
+      }
+    }
 
     return newIds;
   }
