@@ -24,8 +24,6 @@ function MountainsList({view}: {view: Function}) {
 
   async function getMountains() {
     // check sync
-    let db = await getConnection();
-    let row = await db.getFirstAsync('SELECT mountains FROM sync');
     //console.log(row);
 
     try {
@@ -89,6 +87,12 @@ function MountainsList({view}: {view: Function}) {
       setSummitNumber(mountainsClimbed.length);
 
       setMountainsToClimb(mountains);
+
+          let db = await getConnection();
+    let row = await db.getFirstAsync('SELECT * FROM mountains');
+    if (row) {
+      return;
+    }
 
       // sync
       let statement = await db.prepareAsync('INSERT INTO mountains VALUES ($id, $name, $location, $height, $summited)');

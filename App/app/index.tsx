@@ -13,5 +13,5 @@ export default function RootIndex() {
     );
   }
 
-  return <Redirect href={isLoggedIn ? "/(tabs)/climbs" : "/login"} />;
+  return <Redirect href={isLoggedIn ? "/(tabs)/mountains" : "/login"} />;
 }
