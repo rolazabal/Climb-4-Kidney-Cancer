@@ -254,10 +254,10 @@ function RootLayout() {
   async function initializeDatabase() {
     let db = await getConnection();
     await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS times (time INTEGER, climb_id TEXT, is_start BOOLEAN);
-      CREATE TABLE IF NOT EXISTS climbs (id TEXT, mountain_id TEXT, elevation INTEGER, is_active BOOLEAN);
-      CREATE TABLE IF NOT EXISTS mountains (id TEXT, name TEXT, location TEXT, height INTEGER, summited BOOLEAN);
-      CREATE TABLE IF NOT EXISTS notifications (id INTEGER, message TEXT, date INTEGER);
+      CREATE TABLE IF NOT EXISTS times (time INTEGER, climb_id TEXT PRIMARY KEY, is_start BOOLEAN);
+      CREATE TABLE IF NOT EXISTS climbs (id TEXT PRIMARY KEY, mountain_id TEXT, elevation INTEGER, is_active BOOLEAN);
+      CREATE TABLE IF NOT EXISTS mountains (id TEXT PRIMARY KEY, name TEXT, location TEXT, height INTEGER, summited BOOLEAN);
+      CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, message TEXT, date INTEGER);
       DROP TABLE IF EXISTS sync;
     `);
     await db.closeAsync();
