@@ -1,6 +1,6 @@
 export const GATEWAY_URL = "https://climb-4-kidney-cancer-production-fde3.up.railway.app";
 export const MOUNTAINS_URL = "https://mountains-service-production.up.railway.app/mountains";
-export const PROGRESS_URL = "https://progress-service-production-ba74.up.railway.app";
+export const PROGRESS_URL = "https://progress-service-production-ba74.up.railway.app/progress";
 export const USERS_URL    = `${GATEWAY_URL}/users`;
 export const GROUPS_URL    = `${GATEWAY_URL}/groups`;
 export const EVENTS_URL    = `${GATEWAY_URL}/events`;

@@ -1,3 +1,4 @@
+import { PROGRESS_URL } from '@/constants/api';
 import { AuthProvider } from '@/context/auth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -51,15 +52,36 @@ function RootLayout() {
     console.log(ids);
 
     let db = await getConnection();
-    let statement = await db.prepareAsync('UPDATE climbs SET elevation = elevation + $feet WHERE id = $id');
+    let statement = await db.prepareAsync('UPDATE climbs SET elevation = elevation + $feet WHERE id = $id RETURNING id, elevation');
+
+    let rows = new Array();
 
     for (const id of ids) {
-      await statement.executeAsync({$feet: distributed, $id: id});
+      let result = await statement.executeAsync({$feet: distributed, $id: id});
+
+      let row = await result.getFirstAsync();
+
+      rows.push(row);
     }
 
     await statement.finalizeAsync();
 
     await db.closeAsync();
+
+    for (const row of rows) {
+      console.log(row);
+      let res = await fetch(PROGRESS_URL + "/update/" + row.id, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          height: row.elevation,
+        }),
+      });
+      if (res.status !== 200) {
+        // queue request
+        console.log("error syncing mountain elevation");
+      }
+    }
   }
 
   async function summitClimbs(ids: string[]) {
@@ -91,6 +113,8 @@ function RootLayout() {
     });
 
     await db.closeAsync();
+
+
 
     return newIds;
   }
@@ -179,6 +203,7 @@ function RootLayout() {
 
       console.log("climbs were checked");
 
+      /*
       if (activeClimbs.length > 0 && lastDate < date) {
         // get elevation data from lastDate to date
         let { records } = await readRecords('ElevationGained', {
@@ -206,6 +231,7 @@ function RootLayout() {
       activeClimbs = await summitClimbs(activeClimbs);
 
       console.log("currently active climbs checked");
+      */
 
       // create time table entries for non-completed climbs
       let statement = await db.prepareAsync('INSERT INTO times VALUES ($time, $id, $start)');
