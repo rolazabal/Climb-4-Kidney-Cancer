@@ -22,10 +22,43 @@ function MountainsList({view}: {view: Function}) {
 
   const [tab, setTab] = useState(Tabs.all);
 
-  async function getMountains() {
-    // check sync
-    //console.log(row);
+  async function getLocalMountains() {
+    let db = await getConnection();
 
+    try {
+      let rows = await db.getAllAsync('SELECT * FROM mountains');
+
+      if (rows.length < 1) {
+        return;
+      }
+
+      setPeakNumber(rows.length);
+
+      for (const row of rows) {
+        let mountain: Mountain = {
+          uuid: row.id,
+          name: row.name,
+          location: row.location,
+          height: row.height,
+          description: '',
+        }
+
+        if (row.summited) {
+          setMountainsClimbed([...mountainsClimbed, mountain]);
+        } else {
+          setMountainsToClimb([...mountainsToClimb, mountain])
+        }
+      }
+
+      setSummitNumber(mountainsClimbed.length);
+
+      await db.closeAsync();
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async function getMountains() {
     try {
       // request mountain list
       let res = await apiFetch(MOUNTAINS_URL);
@@ -38,10 +71,13 @@ function MountainsList({view}: {view: Function}) {
 
       if (res.status !== 200) {
         console.log('Mountains list failed:', res.status);
+
+        await getLocalMountains();
         return;
       }
       
       let mountains = await res.json();
+
       let imagePromises = mountains.map((mountain: Mountain) => fetch(MOUNTAINS_URL + "/" + mountain.uuid + "/image-url", {
         method: 'GET',
         headers: {'Content-Type': 'application/json'},
@@ -64,42 +100,62 @@ function MountainsList({view}: {view: Function}) {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
+
       if (res.status == 200) {
         let ids = await res.json();
-        ids.forEach((id) => {
+
+        for (const id of ids) {
           let index = 0;
+
           while(index < mountains.length) {
             let cur = mountains[index];
+
             if (cur.uuid === id) {
               setMountainsClimbed([...mountainsClimbed, cur]);
+
               let temp = mountains.slice(0, index);
+
               if (index < mountains.length - 1) {
                 temp = temp.concat(mountains.slice(index + 1, mountains.length));
               }
+
               mountains = temp;
               break;
             }
+
             index ++;
           }
-        });
+        }
       }
 
       setSummitNumber(mountainsClimbed.length);
 
       setMountainsToClimb(mountains);
 
-          let db = await getConnection();
-    let row = await db.getFirstAsync('SELECT * FROM mountains');
-    if (row) {
-      return;
-    }
+      // update local data
+      let db = await getConnection();
 
-      // sync
-      let statement = await db.prepareAsync('INSERT INTO mountains VALUES ($id, $name, $location, $height, $summited)');
-      try {
-        for (let x in mountains) {
-          const key = x as keyof Mountain;
-          let mountain = mountains[key];
+      let update = 'UPDATE mountains SET name = $name, location = $location, height = $height WHERE id = $id';
+
+      let insert = 'INSERT INTO mountains VALUES ($id, $name, $location, $height, $summited)';
+
+      for (const mountain of mountains) {
+        let row = await db.getFirstAsync('SELECT id FROM mountains WHERE id = \"' + mountain.uuid + '\"');
+
+        if (row) {
+          let statement = await db.prepareAsync(update);
+
+          await statement.executeAsync({
+            $id: mountain.uuid, 
+            $name: mountain.name, 
+            $location: mountain.location, 
+            $height: mountain.height
+          });
+
+          await statement.finalizeAsync();
+        } else {
+          let statement = await db.prepareAsync(insert);
+
           await statement.executeAsync({
             $id: mountain.uuid,
             $name: mountain.name,
@@ -107,13 +163,12 @@ function MountainsList({view}: {view: Function}) {
             $height: mountain.height,
             $summited: false
           });
+
+          await statement.finalizeAsync();
         }
-      } finally {
-        await statement.finalizeAsync();
       }
-      statement = await db.prepareAsync('UPDATE sync SET mountains = true WHERE mountains = false');
-      await statement.executeAsync();
-      await statement.finalizeAsync();
+
+      await db.closeAsync();
     } catch (error) {
       console.log('Failed to get mountains:', error);
     }

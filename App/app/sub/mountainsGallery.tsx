@@ -24,6 +24,7 @@ function MountainsGallery({id, back}: {id: string | null, back: Function}) {
                 headers: { 'Content-Type': 'application/json' }
             });
             if (res.status !== 200) {
+                back();
                 console.log('Mountain fetch failed:', res.status);
                 return;
             }

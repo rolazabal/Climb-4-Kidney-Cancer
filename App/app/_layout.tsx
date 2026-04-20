@@ -7,7 +7,7 @@ import * as SQLite from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import * as TaskManager from 'expo-task-manager';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, findNodeHandle } from 'react-native';
+import { AppState } from 'react-native';
 import { initialize, readRecords, requestPermission } from 'react-native-health-connect';
 import 'react-native-reanimated';
 
@@ -58,11 +58,14 @@ function RootLayout() {
     }
 
     await statement.finalizeAsync();
+
+    await db.closeAsync();
   }
 
   async function summitClimbs(ids: string[]) {
     // check ids, process summits, and return new array of active climb ids
     let db = await getConnection();
+
     let rows = await db.getAllAsync(`
       DELETE FROM climbs WHERE id IN (
         SELECT c.id FROM climbs AS c JOIN mountains AS m ON c.mountain_id = m.id
@@ -72,13 +75,11 @@ function RootLayout() {
 
     let statement = await db.prepareAsync("UPDATE mountains SET summited = true WHERE id = $id");
 
-    try {
-      for (const row of rows) {
-        await statement.executeAsync({$id: row.id});
-      }
-    } finally {
-      await statement.finalizeAsync();
+    for (const row of rows) {
+      await statement.executeAsync({$id: row.id});
     }
+    
+    await statement.finalizeAsync();
 
     rows = await db.getAllAsync('SELECT id FROM climbs WHERE is_active = true');
 
@@ -87,6 +88,8 @@ function RootLayout() {
     rows.forEach((row) => {
       newIds.push(row.id);
     });
+
+    await db.closeAsync();
 
     return newIds;
   }
@@ -211,6 +214,8 @@ function RootLayout() {
 
       await statement.finalizeAsync();
       console.log("times table updated");
+
+      await db.closeAsync();
   }
 
   TaskManager.defineTask(DATA_TASK_ID, async () => {
@@ -223,6 +228,7 @@ function RootLayout() {
       return BackgroundTask.BackgroundTaskResult.Failed;
     }
 
+    console.log("Task done!");
     return BackgroundTask.BackgroundTaskResult.Success;
   });
 
@@ -251,15 +257,8 @@ function RootLayout() {
       CREATE TABLE IF NOT EXISTS mountains (id TEXT, name TEXT, location TEXT, height INTEGER, summited BOOLEAN);
       CREATE TABLE IF NOT EXISTS notifications (id INTEGER, message TEXT, date INTEGER);
       DROP TABLE IF EXISTS sync;
-      CREATE TABLE sync (mountains BOOLEAN, climbs BOOLEAN);
     `);
-    let statement = await db.prepareAsync('INSERT INTO sync VALUES ($1, $2)');
-    try {
-      // setup sync table
-      await statement.executeAsync({$1: false, $2: false});
-    } finally {
-      await statement.finalizeAsync();
-    }
+    await db.closeAsync();
   }
 
   const appState = useRef(AppState.currentState);
@@ -313,7 +312,7 @@ function RootLayout() {
 }
 
 export async function getConnection() {
-  const db = SQLite.openDatabaseAsync('app');
+  const db = await SQLite.openDatabaseAsync('app');
   return db;
 }
 

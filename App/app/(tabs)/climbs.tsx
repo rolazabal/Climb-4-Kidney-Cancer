@@ -8,7 +8,7 @@ import { getConnection } from "../_layout";
 
 const c = Colors.light;
 
-const db = getConnection();
+//const db = getConnection();
 
 type Mountain = {
   id: string;
@@ -61,7 +61,7 @@ function Climbs() {
     setAvailableClimbsError(null);
 
     try {
-      const database = await db;
+      const database = await getConnection();
       const availableRows = await database.getAllAsync(`
         SELECT m.id, m.name, m.location, m.height
         FROM mountains m
@@ -76,6 +76,8 @@ function Climbs() {
         WHERE COALESCE(m.summited, 0) = 0
         ORDER BY m.name ASC
       `) as LocalClimbRecord[];
+
+      await database.closeAsync();
 
       setAvailableMountains(
         availableRows.map((mountain) => ({
@@ -116,7 +118,7 @@ function Climbs() {
 
   const startClimb = async (mountain: Mountain) => {
     try {
-      const database = await db;
+      const database = await getConnection();
       const timestamp = Date.now();
       let climbStatement = await database.prepareAsync(`
         INSERT INTO climbs (id, mountain_id, elevation, is_active)
@@ -142,9 +144,11 @@ function Climbs() {
       } finally {
         await climbStatement.finalizeAsync();
         await timeStatement.finalizeAsync();
+        await database.closeAsync();
       }
 
       await loadClimbsFromDb();
+
       setIsSelectingMountain(false);
     } catch (error) {
       console.log("Failed to start climb:", error);
@@ -159,7 +163,7 @@ function Climbs() {
     }
 
     try {
-      const database = await db;
+      const database = await getConnection();
       let climbStatement = await database.prepareAsync(`
         UPDATE climbs
         SET is_active = $isActive
@@ -183,6 +187,7 @@ function Climbs() {
       } finally {
         await climbStatement.finalizeAsync();
         await timeStatement.finalizeAsync();
+        await database.closeAsync();
       }
 
       await loadClimbsFromDb();
@@ -194,7 +199,7 @@ function Climbs() {
 
   const quitClimb = async (mountainId: string) => {
     try {
-      const database = await db;
+      const database = await getConnection();
       let deleteClimbStatement = await database.prepareAsync('DELETE FROM climbs WHERE mountain_id = $mountainId');
       let deleteTimeStatement = await database.prepareAsync('DELETE FROM times WHERE climb_id = $climbId');
 
@@ -204,6 +209,7 @@ function Climbs() {
       } finally {
         await deleteClimbStatement.finalizeAsync();
         await deleteTimeStatement.finalizeAsync();
+        await database.closeAsync();
       }
 
       await loadClimbsFromDb();
@@ -215,7 +221,7 @@ function Climbs() {
 
   const resetClimbProgress = async (mountainId: string) => {
     try {
-      const database = await db;
+      const database = await getConnection();
       let statement = await database.prepareAsync(`
         UPDATE climbs
         SET elevation = 0
@@ -226,6 +232,7 @@ function Climbs() {
         await statement.executeAsync({ $mountainId: mountainId });
       } finally {
         await statement.finalizeAsync();
+        await database.closeAsync();
       }
 
       await loadClimbsFromDb();
