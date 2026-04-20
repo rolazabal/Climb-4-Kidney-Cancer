@@ -137,10 +137,11 @@ function MountainsList({view}: {view: Function}) {
 
       let update = 'UPDATE mountains SET name = $name, location = $location, height = $height WHERE id = $id';
 
-      let insert = 'INSERT INTO mountains VALUES ($id, $name, $location, $height, $summited)';
+      let insert = 'INSERT OR IGNORE INTO mountains VALUES ($id, $name, $location, $height, $summited)';
 
       for (const mountain of mountains) {
-        let row = await db.getFirstAsync('SELECT id FROM mountains WHERE id = \"' + mountain.uuid + '\"');
+        let row = await db.getFirstAsync('SELECT id FROM mountains WHERE id = $id', 
+          { $id: mountain.uuid });
 
         if (row) {
           let statement = await db.prepareAsync(update);
