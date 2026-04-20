@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DeviceType, insertRecords, readRecords, RecordingMethod } from 'react-native-health-connect';
 import { SafeAreaView } from "react-native-safe-area-context";
+import { dataCollect } from '../_layout';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
@@ -90,6 +91,11 @@ function Progress() {
             <TouchableOpacity style={{flex: 2, backgroundColor: 'red', }} onPress={() => {recordProgress(100)}}>
                 <Text>
                     Register 100 ft
+                </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{flex: 2, backgroundColor:'green'}} onPress={() => {dataCollect()}}>
+                <Text>
+                    Update
                 </Text>
             </TouchableOpacity>
             <View style={{flex: 2}}>
