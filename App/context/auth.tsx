@@ -22,6 +22,10 @@ type AuthContextValue = {
   accessToken: string | null;
   logIn: (session: Session) => Promise<void>;
   logOut: () => Promise<void>;
+  // Update the in-memory username after a successful profile save,
+  // so other screens (e.g. Profile tab) reflect it immediately
+  // without needing a reload or another network round-trip.
+  updateUsername: (newUsername: string) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -103,6 +107,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           SecureStore.setItemAsync(REFRESH_TOKEN_KEY, nextSession.refreshToken),
         ]);
         setSession(nextSession);
+      },
+
+      updateUsername: (newUsername: string) => {
+        setSession((prev) => (prev ? { ...prev, username: newUsername } : prev));
       },
 
       logOut: async () => {

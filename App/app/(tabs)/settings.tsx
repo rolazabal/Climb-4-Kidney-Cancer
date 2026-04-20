@@ -22,10 +22,11 @@ const KeyboardAvoidingView = RNKeyboardAvoidingView as React.ComponentType<{
 }>;
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { User, Settings as SettingsIcon, Save, LogOut } from 'lucide-react-native';
+import { Settings as SettingsIcon, Save, LogOut } from 'lucide-react-native';
 
 import { AppText } from './_layout';
 import { EditableField } from '@/components/EditableField';
+import { useAuth } from '@/context/auth';
 import { getProfile, updateProfile, updatePassword } from '@/Services/userService';
 import {
   validateUsername,
@@ -40,9 +41,8 @@ const c = Colors.light;
 const BIO_MAX = 150;
 
 export default function SettingsScreen() {
+  const { updateUsername } = useAuth();
   //fields
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [bio, setBio] = useState('');
@@ -63,8 +63,6 @@ export default function SettingsScreen() {
   const loadProfile = useCallback(async () => {
     try {
       const profile = await getProfile();
-      setFirstName(profile.firstName ?? '');
-      setLastName(profile.lastName ?? '');
       setUsername(profile.username ?? '');
       setEmail(profile.email ?? '');
       setBio(profile.bio ?? '');
@@ -147,8 +145,6 @@ export default function SettingsScreen() {
   }, [username, email, currentPassword, newPassword, confirmPassword, bio]);
   //change only when any field changes. (changes are valid)
   const hasEdits =
-    firstName.trim() !== '' ||
-    lastName.trim() !== '' ||
     username.trim() !== '' ||
     email.trim() !== '' ||
     bio.trim() !== '' ||
@@ -164,8 +160,6 @@ export default function SettingsScreen() {
     setIsSaving(true);
     try {
       const updates: Parameters<typeof updateProfile>[0] = {};
-      if (firstName.trim()) updates.firstName = firstName.trim();
-      if (lastName.trim()) updates.lastName = lastName.trim();
       if (username.trim()) updates.username = username.trim();
       if (email.trim()) updates.email = email.trim();
       updates.bio = bio;
@@ -176,6 +170,11 @@ export default function SettingsScreen() {
         if (!result.success) {
           Alert.alert('Error', result.error ?? 'Failed to save');
           return;
+        }
+        // Reflect new username in the auth context so other screens
+        // (e.g. Profile tab) update immediately without a reload.
+        if (updates.username !== undefined) {
+          updateUsername(updates.username ?? '');
         }
       }
       //update password.
@@ -198,7 +197,7 @@ export default function SettingsScreen() {
     } finally {
       setIsSaving(false);
     }
-  }, [canSave, isSaving, runValidation, firstName, lastName, username, email, bio, profilePictureUri, newPassword, currentPassword]);
+  }, [canSave, isSaving, runValidation, username, email, bio, profilePictureUri, newPassword, currentPassword, updateUsername]);
   //backend not implemented yet. 
   const handleLogout = useCallback(() => {
     Alert.alert('Log out', 'Are you sure you want to log out?', [
@@ -237,32 +236,11 @@ export default function SettingsScreen() {
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <User size={18} color={c.heading} />
-              <AppText style={styles.cardTitle}>Account Information</AppText>
-            </View>
-            <EditableField
-              label="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="Enter your first name"
-            />
-            <EditableField
-              label="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Enter your last name"
-            />
-            <AppText style={styles.fieldLabel}>Email</AppText>
-            <AppText style={styles.readOnlyValue}>{email || '—'}</AppText>
-            <View style={styles.roleBadge}>
-              <AppText style={styles.roleText}>admin</AppText>
-            </View>
-          </View>
-
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
               <SettingsIcon size={18} color={c.heading} />
               <AppText style={styles.cardTitle}>Profile Settings</AppText>
+              <View style={styles.roleBadge}>
+                <AppText style={styles.roleText}>admin</AppText>
+              </View>
             </View>
 
             <EditableField

@@ -9,7 +9,7 @@ async function refreshTokens(): Promise<string | null> {
 
     if (!refreshToken) return null;
 
-    const res = await fetch('${AUTH_URL}/refresh', {
+    const res = await fetch(`${AUTH_URL}/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: refreshToken }),
