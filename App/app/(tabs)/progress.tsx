@@ -1,6 +1,6 @@
 import { THEME_COLORS } from '@/constants/api';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DeviceType, insertRecords, readRecords, RecordingMethod } from 'react-native-health-connect';
 import { SafeAreaView } from "react-native-safe-area-context";
