@@ -87,7 +87,7 @@ function Progress() {
 
     return (
         <SafeAreaView style={{flex: 1, marginHorizontal: 10}}>
-            <TouchableOpacity onPress={() => {recordProgress(100)}}>
+            <TouchableOpacity style={{flex: 2, backgroundColor: 'red', }} onPress={() => {recordProgress(100)}}>
                 <Text>
                     Register 100 ft
                 </Text>
