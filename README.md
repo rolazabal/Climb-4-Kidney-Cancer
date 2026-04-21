@@ -1,2 +1,7 @@
-# Climb-4-Kidney-Cancer
- SummitSteps App
+#  SummitSteps App
+### In partnership with climb for Kidney Cancer
+
+Done with Climb 4 Kidney Cancer (Climb4KC), a non-profit organization founded in 2013 by Dr. Christopher Weight in Minneapolis to address the need for stronger kidney cancer advocacy. Climb4KC promotes wellness, raises funds for research, and celebrates people affected by kidney cancer. Today, Climb4KC hosts annual stair climbing events in Minneapolis and Cleveland. Beyond stadium climbs, the organization also organizes mountain climbing challenges—including international climbs—designed to extend engagement and support kidney cancer research through participant-led fundraising. Climb4KC is currently seeking a digital engagement platform that aligns with its goals of promoting wellness and kidney cancer awareness. 
+
+We developed SummitSteps, a mobile app that tracks users’ elevation gain or stair flights using phone sensors or wearable data (Apple Health, Google Fit, etc.). Users will be able to select a mountain to “climb,” and their cumulative elevation from daily activity will progress them toward that peak. When they reach the mountain’s height, they “summit.” Users can also form groups with other users and participate in group climbs. Group climb progress will be visible to all users via a leaderboard, to promote a competitive spirit amongst groups. The goal for SummitSteps is to create a platform for the community of Climb4KC that will encourage engagement in their campaigns and further spread kidney cancer awareness.
+

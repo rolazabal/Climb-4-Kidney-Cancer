@@ -4,8 +4,8 @@ import { apiFetch } from "@/components/apiFetch";
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getConnection } from '@/lib/database';
 import { Mountain } from '../(tabs)/mountains';
-import { getConnection } from '../_layout';
 
 function MountainsList({view}: {view: Function}) {
   const mountainsClimbed: Mountain[] = [];

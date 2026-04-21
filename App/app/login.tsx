@@ -1,5 +1,14 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useRef, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { AUTH_URL, USERS_URL } from "@/constants/api";
@@ -12,6 +21,7 @@ type Step = "email" | "otp";
 type Mode = "login" | "create";
 
 export default function LoginScreen() {
+  const scrollViewRef = useRef<ScrollView>(null);
   const [mode, setMode] = useState<Mode>("login");
   const [step, setStep] = useState<Step>("email");
 
@@ -155,112 +165,146 @@ export default function LoginScreen() {
     clearError();
   }
 
+  function scrollToFocusedInput(y: number) {
+    scrollViewRef.current?.scrollTo({
+      y: Math.max(0, y - 120),
+      animated: true,
+    });
+  }
+
   if (step === "otp") {
     return (
       <SafeAreaView style={styles.screen} edges={["top"]}>
-        <View style={styles.content}>
-          <Text style={styles.pageTitle}>Check your email</Text>
-          <Text style={styles.pageSubtitle}>
-            We sent a 6-digit code to{" "}
-            <Text style={{ fontWeight: "700" }}>{email.trim().toLowerCase()}</Text>
-          </Text>
-
-          <View style={styles.formCard}>
-            <Text style={styles.label}>Verification Code</Text>
-            <TextInput
-              autoFocus
-              keyboardType="number-pad"
-              maxLength={6}
-              onChangeText={(v) => { clearError(); setOtp(v); }}
-              placeholder="123456"
-              placeholderTextColor={c.icon}
-              style={[styles.input, styles.otpInput]}
-              value={otp}
-            />
-
-            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-            <Pressable onPress={handleOtpSubmit} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>
-                {isSubmitting ? "Verifying..." : "Verify Code"}
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView
+            ref={scrollViewRef}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.content}>
+              <Text style={styles.pageTitle}>Check your email</Text>
+              <Text style={styles.pageSubtitle}>
+                We sent a 6-digit code to{" "}
+                <Text style={{ fontWeight: "700" }}>{email.trim().toLowerCase()}</Text>
               </Text>
-            </Pressable>
-          </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Didn&apos;t receive the code?</Text>
-            <Pressable onPress={handleResend} style={styles.linkButton}>
-              <Text style={styles.linkButtonText}>Resend Code</Text>
-            </Pressable>
-          </View>
-        </View>
+              <View style={styles.formCard}>
+                <Text style={styles.label}>Verification Code</Text>
+                <TextInput
+                  autoFocus
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  onChangeText={(v) => { clearError(); setOtp(v); }}
+                  onFocus={() => scrollToFocusedInput(280)}
+                  placeholder="123456"
+                  placeholderTextColor={c.icon}
+                  style={[styles.input, styles.otpInput]}
+                  value={otp}
+                />
+
+                {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+                <Pressable onPress={handleOtpSubmit} style={styles.primaryButton}>
+                  <Text style={styles.primaryButtonText}>
+                    {isSubmitting ? "Verifying..." : "Verify Code"}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>Didn&apos;t receive the code?</Text>
+                <Pressable onPress={handleResend} style={styles.linkButton}>
+                  <Text style={styles.linkButtonText}>Resend Code</Text>
+                </Pressable>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
-      <View style={styles.content}>
-        <Text style={styles.pageTitle}>{isCreatingAccount ? "Create Account" : "Log In"}</Text>
-        <Text style={styles.pageSubtitle}>
-          {isCreatingAccount
-            ? "Set an email and username for your new account."
-            : "We'll send a verification code to your email."}
-        </Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+            <Text style={styles.pageTitle}>{isCreatingAccount ? "Create Account" : "Log In"}</Text>
+            <Text style={styles.pageSubtitle}>
+              {isCreatingAccount
+                ? "Set an email and username for your new account."
+                : "We'll send a verification code to your email."}
+            </Text>
 
-        <View style={styles.formCard}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            autoCapitalize="none"
-            keyboardType="email-address"
-            onChangeText={(v) => { clearError(); setEmail(v); }}
-            placeholder="name@example.com"
-            placeholderTextColor={c.icon}
-            style={styles.input}
-            value={email}
-          />
-
-          {isCreatingAccount && (
-            <>
-              <Text style={styles.label}>Username</Text>
+            <View style={styles.formCard}>
+              <Text style={styles.label}>Email</Text>
               <TextInput
                 autoCapitalize="none"
-                onChangeText={(v) => { clearError(); setUsername(v); }}
-                placeholder="new_username"
+                keyboardType="email-address"
+                onChangeText={(v) => { clearError(); setEmail(v); }}
+                onFocus={() => scrollToFocusedInput(220)}
+                placeholder="name@example.com"
                 placeholderTextColor={c.icon}
                 style={styles.input}
-                value={username}
+                value={email}
               />
-            </>
-          )}
 
-          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+              {isCreatingAccount && (
+                <>
+                  <Text style={styles.label}>Username</Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(v) => { clearError(); setUsername(v); }}
+                    onFocus={() => scrollToFocusedInput(320)}
+                    placeholder="new_username"
+                    placeholderTextColor={c.icon}
+                    style={styles.input}
+                    value={username}
+                  />
+                </>
+              )}
 
-          <Pressable onPress={handleEmailSubmit} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>
-              {isSubmitting
-                ? "Sending..."
-                : isCreatingAccount
-                ? "Create Account"
-                : "Send Code"}
-            </Text>
-          </Pressable>
-        </View>
+              {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            {isCreatingAccount ? "Already have an account?" : "Don't have an account?"}
-          </Text>
-          <Pressable
-            onPress={() => { clearError(); setMode((m) => (m === "login" ? "create" : "login")); }}
-            style={styles.linkButton}
-          >
-            <Text style={styles.linkButtonText}>
-              {isCreatingAccount ? "Back to Log In" : "Create New Account"}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
+              <Pressable onPress={handleEmailSubmit} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>
+                  {isSubmitting
+                    ? "Sending..."
+                    : isCreatingAccount
+                    ? "Create Account"
+                    : "Send Code"}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>
+                {isCreatingAccount ? "Already have an account?" : "Don't have an account?"}
+              </Text>
+              <Pressable
+                onPress={() => { clearError(); setMode((m) => (m === "login" ? "create" : "login")); }}
+                style={styles.linkButton}
+              >
+                <Text style={styles.linkButtonText}>
+                  {isCreatingAccount ? "Back to Log In" : "Create New Account"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -270,8 +314,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: c.background,
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  content: {
+    flexGrow: 1,
     padding: 20,
     justifyContent: "center",
   },

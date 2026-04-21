@@ -1,10 +1,11 @@
 import { Colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+import { getConnection } from "@/lib/database";
+import { syncHealthClimbs } from "@/lib/healthSync";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getConnection } from "../_layout";
 
 const c = Colors.light;
 
@@ -61,6 +62,12 @@ function Climbs() {
     setAvailableClimbsError(null);
 
     try {
+      try {
+        await syncHealthClimbs();
+      } catch (error) {
+        console.log("Health sync skipped while loading climbs:", error);
+      }
+
       const database = await db;
       const availableRows = await database.getAllAsync(`
         SELECT m.id, m.name, m.location, m.height

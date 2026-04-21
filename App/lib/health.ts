@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import { getFlightsClimbed, initHealthKit } from "./healthkitService";
+import { getDailyFlightsClimbedSamples, initHealthKit } from "./healthkitService";
 
 type ElevationRecord = {
   startTime: string;
@@ -73,7 +73,7 @@ export async function readElevationRecords(
   }
 
   if (Platform.OS === "ios") {
-    const flights = (await getFlightsClimbed(startTime, endTime)) as Array<{
+    const flights = (await getDailyFlightsClimbedSamples(startTime, endTime)) as Array<{
       startDate?: string;
       endDate?: string;
       value?: number;

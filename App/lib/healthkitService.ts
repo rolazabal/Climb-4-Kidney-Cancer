@@ -1,38 +1,60 @@
-//import AppleHealthKit from 'react-native-health';
-const HealthKitModule = require('react-native-health');
-const AppleHealthKit = 
-    HealthKitModule.default?.initHealthKit
-    ? HealthKitModule.default
-    : HealthKitModule;
+import { Platform } from "react-native";
 
-console.log("HealthKit object:", AppleHealthKit);
-
-const permissions = {
-  permissions: {
-    read: [
-      AppleHealthKit.Constants.Permissions.FlightsClimbed,
-    ],
-    write: [],
-  },
+type HealthSample = {
+  value?: number;
+  startDate?: string;
+  endDate?: string;
 };
 
-export const initHealthKit = () => {
-  return new Promise((resolve, reject) => {
-    AppleHealthKit.initHealthKit(permissions, (err: any) => {
-      if (err) reject(err);
-      else resolve(true);
+function getAppleHealthKit() {
+  if (Platform.OS !== "ios") {
+    throw new Error("Apple HealthKit is only available on iOS.");
+  }
+
+  const healthKitModule = require("react-native-health");
+
+  return healthKitModule.default?.initHealthKit ? healthKitModule.default : healthKitModule;
+}
+
+export async function initHealthKit() {
+  const AppleHealthKit = getAppleHealthKit();
+  const permissions = {
+    permissions: {
+      read: [AppleHealthKit.Constants.Permissions.FlightsClimbed],
+      write: [],
+    },
+  };
+
+  return new Promise<boolean>((resolve, reject) => {
+    AppleHealthKit.initHealthKit(permissions, (error: string) => {
+      if (error) {
+        reject(new Error(error));
+        return;
+      }
+
+      resolve(true);
     });
   });
-};
+}
 
-export const getFlightsClimbed = (startDate: string, endDate: string) => {
-  return new Promise((resolve, reject) => {
-    AppleHealthKit.getFlightsClimbed(
-      { startDate, endDate },
-      (err: any, results: any) => {
-        if (err) reject(err);
-        else resolve(results);
+export async function getDailyFlightsClimbedSamples(startDate: string, endDate: string) {
+  const AppleHealthKit = getAppleHealthKit();
+
+  return new Promise<HealthSample[]>((resolve, reject) => {
+    AppleHealthKit.getDailyFlightsClimbedSamples(
+      {
+        startDate,
+        endDate,
+        ascending: true,
+      },
+      (error: string, results: HealthSample[]) => {
+        if (error) {
+          reject(new Error(error));
+          return;
+        }
+
+        resolve(results ?? []);
       }
     );
   });
-};
+}

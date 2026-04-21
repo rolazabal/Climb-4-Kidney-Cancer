@@ -1,7 +1,7 @@
 //use state: make it reactive to user input
 //use effect: load profile data on mount
 //use callback: Prevents Unnecessary Re-Creation of Functions
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -40,6 +40,8 @@ const c = Colors.light;
 const BIO_MAX = 150;
 
 export default function SettingsScreen() {
+  const scrollViewRef = useRef<ScrollView>(null);
+  const fieldPositions = useRef<Record<string, number>>({});
   //fields
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -207,6 +209,22 @@ export default function SettingsScreen() {
     ]);
   }, []);
 
+  const registerFieldPosition = useCallback((key: string, y: number) => {
+    fieldPositions.current[key] = y;
+  }, []);
+
+  const scrollToField = useCallback((key: string) => {
+    const y = fieldPositions.current[key];
+    if (typeof y !== 'number') {
+      return;
+    }
+
+    scrollViewRef.current?.scrollTo({
+      y: Math.max(0, y - 140),
+      animated: true,
+    });
+  }, []);
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -225,6 +243,7 @@ export default function SettingsScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -240,18 +259,24 @@ export default function SettingsScreen() {
               <User size={18} color={c.heading} />
               <AppText style={styles.cardTitle}>Account Information</AppText>
             </View>
-            <EditableField
-              label="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="Enter your first name"
-            />
-            <EditableField
-              label="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Enter your last name"
-            />
+            <View onLayout={(event) => registerFieldPosition('firstName', event.nativeEvent.layout.y)}>
+              <EditableField
+                label="First Name"
+                value={firstName}
+                onChangeText={setFirstName}
+                onFocus={() => scrollToField('firstName')}
+                placeholder="Enter your first name"
+              />
+            </View>
+            <View onLayout={(event) => registerFieldPosition('lastName', event.nativeEvent.layout.y)}>
+              <EditableField
+                label="Last Name"
+                value={lastName}
+                onChangeText={setLastName}
+                onFocus={() => scrollToField('lastName')}
+                placeholder="Enter your last name"
+              />
+            </View>
             <AppText style={styles.fieldLabel}>Email</AppText>
             <AppText style={styles.readOnlyValue}>{email || '—'}</AppText>
             <View style={styles.roleBadge}>
@@ -265,77 +290,95 @@ export default function SettingsScreen() {
               <AppText style={styles.cardTitle}>Profile Settings</AppText>
             </View>
 
-            <EditableField
-              label="Username"
-              value={username}
-              onChangeText={(t) => {
-                setUsername(t);
-                if (usernameError) setUsernameError(validateUsername(t).error);
-              }}
-              placeholder="Choose a username"
-              error={usernameError}
-              onBlur={() => username.trim() && setUsernameError(validateUsername(username).error)}
-            />
+            <View onLayout={(event) => registerFieldPosition('username', event.nativeEvent.layout.y)}>
+              <EditableField
+                label="Username"
+                value={username}
+                onChangeText={(t) => {
+                  setUsername(t);
+                  if (usernameError) setUsernameError(validateUsername(t).error);
+                }}
+                onFocus={() => scrollToField('username')}
+                placeholder="Choose a username"
+                error={usernameError}
+                onBlur={() => username.trim() && setUsernameError(validateUsername(username).error)}
+              />
+            </View>
 
             <AppText style={styles.sectionLabel}>Change Password:</AppText>
-            <EditableField
-              label="Current password"
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Enter current password"
-              secureTextEntry
-            />
-            <EditableField
-              label="New password"
-              value={newPassword}
-              onChangeText={(t) => {
-                setNewPassword(t);
-                if (passwordError) setPasswordError(validatePassword(t).error);
-              }}
-              placeholder="Min 8 characters, one number"
-              error={passwordError}
-              secureTextEntry
-            />
-            <EditableField
-              label="Confirm password"
-              value={confirmPassword}
-              onChangeText={(t) => {
-                setConfirmPassword(t);
-                if (confirmPasswordError && t === newPassword) setConfirmPasswordError(undefined);
-              }}
-              placeholder="Confirm new password"
-              error={confirmPasswordError}
-              secureTextEntry
-            />
+            <View onLayout={(event) => registerFieldPosition('currentPassword', event.nativeEvent.layout.y)}>
+              <EditableField
+                label="Current password"
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                onFocus={() => scrollToField('currentPassword')}
+                placeholder="Enter current password"
+                secureTextEntry
+              />
+            </View>
+            <View onLayout={(event) => registerFieldPosition('newPassword', event.nativeEvent.layout.y)}>
+              <EditableField
+                label="New password"
+                value={newPassword}
+                onChangeText={(t) => {
+                  setNewPassword(t);
+                  if (passwordError) setPasswordError(validatePassword(t).error);
+                }}
+                onFocus={() => scrollToField('newPassword')}
+                placeholder="Min 8 characters, one number"
+                error={passwordError}
+                secureTextEntry
+              />
+            </View>
+            <View onLayout={(event) => registerFieldPosition('confirmPassword', event.nativeEvent.layout.y)}>
+              <EditableField
+                label="Confirm password"
+                value={confirmPassword}
+                onChangeText={(t) => {
+                  setConfirmPassword(t);
+                  if (confirmPasswordError && t === newPassword) setConfirmPasswordError(undefined);
+                }}
+                onFocus={() => scrollToField('confirmPassword')}
+                placeholder="Confirm new password"
+                error={confirmPasswordError}
+                secureTextEntry
+              />
+            </View>
 
-            <EditableField
-              label="Link Email"
-              value={email}
-              onChangeText={(t) => {
-                setEmail(t);
-                if (emailError) setEmailError(validateEmail(t).error);
-              }}
-              placeholder="your@email.com"
-              error={emailError}
-              onBlur={() => email.trim() && setEmailError(validateEmail(email).error)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <View onLayout={(event) => registerFieldPosition('linkEmail', event.nativeEvent.layout.y)}>
+              <EditableField
+                label="Link Email"
+                value={email}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  if (emailError) setEmailError(validateEmail(t).error);
+                }}
+                onFocus={() => scrollToField('linkEmail')}
+                placeholder="your@email.com"
+                error={emailError}
+                onBlur={() => email.trim() && setEmailError(validateEmail(email).error)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
 
-            <EditableField
-              label="Bio"
-              value={bio}
-              onChangeText={(t) => {
-                setBio(t);
-                if (bioError) setBioError(validateBio(t).error);
-              }}
-              placeholder="Tell us about yourself..."
-              error={bioError}
-              multiline
-              maxLength={BIO_MAX}
-              showCharCount
-            />
+            <View onLayout={(event) => registerFieldPosition('bio', event.nativeEvent.layout.y)}>
+              <EditableField
+                label="Bio"
+                value={bio}
+                onChangeText={(t) => {
+                  setBio(t);
+                  if (bioError) setBioError(validateBio(t).error);
+                }}
+                onFocus={() => scrollToField('bio')}
+                placeholder="Tell us about yourself..."
+                error={bioError}
+                multiline
+                maxLength={BIO_MAX}
+                showCharCount
+              />
+            </View>
 
             <AppText style={styles.fieldLabel}>Profile Picture</AppText>
             <View style={styles.profilePictureRow}>

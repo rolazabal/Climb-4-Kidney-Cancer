@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { insertElevationRecord, readElevationRecords } from '@/lib/health';
+import { syncHealthClimbs } from '@/lib/healthSync';
 
 const theme = {
     primary: 'rgb(51, 51, 51)',
@@ -21,9 +22,14 @@ function Progress() {
 
     async function getProgress() {
         console.log("Getting progress");
+        try {
+            await syncHealthClimbs();
+        } catch (error) {
+            console.log("Health sync skipped while loading progress:", error);
+        }
 
         let endDate = new Date();
-        let startDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDay());
+        let startDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
 
         console.log(startDate);
 

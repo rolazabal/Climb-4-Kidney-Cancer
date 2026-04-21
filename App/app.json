@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.SummitSteps"
+      "bundleIdentifier": "com.anonymous.SummitSteps",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Track your climbing progress using Health data",
+        "NSHealthUpdateUsageDescription": "Update climbing stats based on activity"
+      }
     },
     "android": {
       "package": "com.anonymous.App"
@@ -35,6 +39,7 @@
       ],
       "expo-background-task",
       "expo-sqlite",
+      "react-native-health",
       [
         "expo-build-properties",
         {
@@ -51,27 +56,6 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "expo": {
-      "ios": {
-        "infoPlist": {
-          "NSHealthShareUsageDescription": "Track your climbing progress using Health data",
-          "NSHealthUpdateUsageDescription": "Update climbing stats based on activity"
-        }
-      },
-      "plugins": [
-        [
-          "react-native-health",
-          {
-            "permissions": {
-              "read": [
-                "FlightsClimbed"
-              ],
-              "write": []
-            }
-          }
-        ]
-      ]
     }
   }
 }
