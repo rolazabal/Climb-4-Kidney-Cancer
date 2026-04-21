@@ -141,14 +141,6 @@ function ProfilePage() {
             <Ionicons name="ellipse-outline" size={38} color={c.tabIconDefault} />
             <Text style={styles.achievementsText}>No achievements yet</Text>
           </View>
-
-          <View style={styles.accountCard}>
-            <Text style={styles.accountTitle}>Account</Text>
-            <Text style={styles.accountMeta}>Current user ID: {userId ?? "None"}</Text>
-            <Pressable onPress={handleLogOut} style={styles.logoutButton}>
-              <Text style={styles.logoutButtonText}>Log Out</Text>
-            </Pressable>
-          </View>
         </ScrollView>
       </SafeAreaView>
     </>

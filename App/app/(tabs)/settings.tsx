@@ -13,6 +13,8 @@ import {
   Image,
 } from 'react-native';
 import { KeyboardAvoidingView as RNKeyboardAvoidingView } from 'react-native';
+import { useAuth } from '@/context/auth';
+import { router } from 'expo-router';
 
 const KeyboardAvoidingView = RNKeyboardAvoidingView as React.ComponentType<{
   style?: object;
@@ -61,6 +63,7 @@ export default function SettingsScreen() {
   //prevent multiple saves and show loading state
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const { logOut } = useAuth();
 
   const loadProfile = useCallback(async () => {
     try {
@@ -202,10 +205,14 @@ export default function SettingsScreen() {
     }
   }, [canSave, isSaving, runValidation, firstName, lastName, username, email, bio, profilePictureUri, newPassword, currentPassword]);
   //backend not implemented yet. 
+  async function handleLogOut() {
+      await logOut();
+      router.replace("/login");
+  }
   const handleLogout = useCallback(() => {
     Alert.alert('Log out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => {} },
+      { text: 'Log out', style: 'destructive', onPress: () => handleLogOut() },
     ]);
   }, []);
 
