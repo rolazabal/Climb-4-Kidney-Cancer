@@ -802,4 +802,4 @@ async def get_group_rank(group_id: uuid.UUID):
         if group["group_id"] == str(group_id):
             return {**group, "rank": i, "total_groups": len(ranked)}
 
-    raise HTTPException(404, "Group not found in leaderboard")
+    raise HTTPException(404, "Group not found in leaderboard"

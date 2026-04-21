@@ -105,6 +105,7 @@ def to_mountain_key(filename_or_key: str) -> str:
 
     return keys 
 
+# List every image under specific mountain directory
 def list_mountain_image_keys(mountain_stem: str) -> list[str]:
     prefix = f"{MOUNTAIN_PREFIX}{mountain_stem}/"
     response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
@@ -314,19 +315,19 @@ async def get_mountain_gallery(mountain_id: str):
 
     # Consistency Rule: The image_url in the DB is just a filename (e.g. "mt_bierstadt.png"),
     # and the S3 folder structure is organized by mountain stem
-    # (e.g. "MountainsImages/mt_bierstadt/mt_bierstadt.png").
-    # This way, we can easily find all images for a mountain by using the stem as a prefix.
+    # (e.g. "MountainsImages/mt_bierstadt/mt_bierstadt.png")
     stem = os.path.splitext(row["image_url"])[0]  # "mt_bierstadt"
     keys = list_mountain_image_keys(stem)
 
-    # Exclude the stem/hero image (already served by /image-url).
-    # Gallery should only contain the other images in the folder.
+    # Exclude the cover image (mountain_name image).
+    # Only other images in the folder.
     stem_key = to_mountain_key(row["image_url"])  # "MountainsImages/mt_bierstadt/mt_bierstadt.png"
     keys = [k for k in keys if k != stem_key]
 
     urls = [presigned_get_url(key) for key in keys]
     return {"urls": urls}
 
+# Health DB connection check
 @app.get("/health")
 async def health():
     try:
