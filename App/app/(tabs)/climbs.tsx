@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getConnection } from "../_layout";
+import { PROGRESS_URL } from "@/constants/api";
 
 const c = Colors.light;
 
@@ -150,6 +151,25 @@ function Climbs() {
       await loadClimbsFromDb();
 
       setIsSelectingMountain(false);
+
+      let res = await fetch(PROGRESS_URL, {
+        method: 'POST',
+        headers: {'Coontent-Type': 'application/json'},
+        body: JSON.stringify({
+          user_id: userId,
+          mountain_id: mountain.id,
+          height: 0
+        })
+      })
+
+      if (res.status !== 200) {
+        console.log("error creating climb on service");
+        return;
+      }
+
+      res = await res.json();
+
+      
     } catch (error) {
       console.log("Failed to start climb:", error);
       Alert.alert("Could not start climb", "Please try again.");

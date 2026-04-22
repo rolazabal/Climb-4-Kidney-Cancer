@@ -58,80 +58,8 @@ function MountainsList({view}: {view: Function}) {
     }
   }
 
-  async function getMountains() {
+  async function storeLocalMountains(mountains: Mountain[]) {
     try {
-      // request mountain list
-      let res = await apiFetch(MOUNTAINS_URL);
-
-      if (res.status === 401) {
-        await logOut();
-        router.replace("/login");
-        return;
-      }
-
-      if (res.status !== 200) {
-        console.log('Mountains list failed:', res.status);
-
-        await getLocalMountains();
-        return;
-      }
-      
-      let mountains = await res.json();
-
-      let imagePromises = mountains.map((mountain: Mountain) => fetch(MOUNTAINS_URL + "/" + mountain.uuid + "/image-url", {
-        method: 'GET',
-        headers: {'Content-Type': 'application/json'},
-      })
-        .then((res) => (res.status === 200 ? res.json() : null))
-        .then((data) => (data?.url ? data.url : null))
-        .catch(() => null)
-      );
-
-      let urls = await Promise.all(imagePromises);
-      mountains = mountains.map((mountain: Mountain, index: number) => ({
-        ...mountain,
-        image_presigned_url: urls[index],
-      }));
-
-      setPeakNumber(mountains.length);
-
-      // get mountains climbed
-      res = await apiFetch(PROGRESS_URL + '/progress/user/' + userId + '/complete', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (res.status == 200) {
-        let ids = await res.json();
-
-        for (const id of ids) {
-          let index = 0;
-
-          while(index < mountains.length) {
-            let cur = mountains[index];
-
-            if (cur.uuid === id) {
-              setMountainsClimbed([...mountainsClimbed, cur]);
-
-              let temp = mountains.slice(0, index);
-
-              if (index < mountains.length - 1) {
-                temp = temp.concat(mountains.slice(index + 1, mountains.length));
-              }
-
-              mountains = temp;
-              break;
-            }
-
-            index ++;
-          }
-        }
-      }
-
-      setSummitNumber(mountainsClimbed.length);
-
-      setMountainsToClimb(mountains);
-
       // update local data
       let db = await getConnection();
 
@@ -170,6 +98,86 @@ function MountainsList({view}: {view: Function}) {
       }
 
       await db.closeAsync();
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+
+  async function getMountains() {
+    try {
+      // request mountain list
+      let res = await apiFetch(MOUNTAINS_URL);
+
+      if (res.status === 401) {
+        await logOut();
+        router.replace("/login");
+        return;
+      }
+
+      if (res.status !== 200) {
+        console.log('Mountains list failed:', res.status);
+
+        await getLocalMountains();
+        return;
+      }
+      
+      let mountains = await res.json();
+
+      setPeakNumber(mountains.length);
+
+      let imagePromises = mountains.map((mountain: Mountain) => fetch(MOUNTAINS_URL + "/" + mountain.uuid + "/image-url", {
+        method: 'GET',
+        headers: {'Content-Type': 'application/json'},
+      })
+        .then((res) => (res.status === 200 ? res.json() : null))
+        .then((data) => (data?.url ? data.url : null))
+        .catch(() => null)
+      );
+
+      let urls = await Promise.all(imagePromises);
+      mountains = mountains.map((mountain: Mountain, index: number) => ({
+        ...mountain,
+        image_presigned_url: urls[index],
+      }));
+
+      // get mountains climbed
+      res = await apiFetch(PROGRESS_URL + '/progress/user/' + userId + '/complete', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (res.status == 200) {
+        let ids = await res.json();
+
+        for (const id of ids) {
+          let index = 0;
+
+          while(index < mountains.length) {
+            let cur = mountains[index];
+
+            if (cur.uuid === id) {
+              setMountainsClimbed([...mountainsClimbed, cur]);
+
+              let temp = mountains.slice(0, index);
+
+              if (index < mountains.length - 1) {
+                temp = temp.concat(mountains.slice(index + 1, mountains.length));
+              }
+
+              mountains = temp;
+              break;
+            }
+
+            index ++;
+          }
+        }
+      }
+
+      setSummitNumber(mountainsClimbed.length);
+
+      setMountainsToClimb(mountains);
+
+      storeLocalMountains(mountains);
     } catch (error) {
       console.log('Failed to get mountains:', error);
     }
@@ -223,7 +231,7 @@ function MountainsList({view}: {view: Function}) {
         </View>
       </View>
       <View style={{ flex: 2 }}>
-        {tab === Tabs.all && <MountainList arr={mountainsClimbed.concat(mountainsToClimb)} /*view={() => {;}}*/ view={(id: string) => {view(id)}} />}
+        {tab === Tabs.all && <MountainList arr={mountainsClimbed.concat(mountainsToClimb)} /*view={() => {;}}*/ view={() => {;}} />}
         {tab === Tabs.climbed && <MountainList arr={mountainsClimbed} view={(id: string) => {view(id)}} />}
         {tab === Tabs.toClimb && <MountainList arr={mountainsToClimb} view={() => {;}} /*view={(id: string) => {view(id)}}*/ />}
       </View>
