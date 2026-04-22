@@ -330,12 +330,9 @@ async def list_invites_for_user(conn, user_id):
     )
     return [dict(row) for row in rows]
 
-
+# Updates the invite status. Returns the updated row
+# or None if  the invite doesn't exist or doesn't belong to invitee_id.
 async def update_invite(conn, invite_id, invitee_id, status: str):
-    """
-    Updates the invite status. Returns the updated row, or None if
-    the invite doesn't exist or doesn't belong to invitee_id.
-    """
     row = await conn.fetchrow(
         """
         UPDATE group_invites
@@ -488,23 +485,21 @@ async def make_group(group: Group, current_user: str = Depends(get_current_user)
     return {"message": "Group created successfully", "id": new_id}
 
 @app.get("/groups/{group_id}")
+# Returns group info
 async def read_group(group_id: uuid.UUID):
     async with app.state.pool.acquire() as conn:
         result = await get_group(conn, group_id)
     return {"message": "Group retrieved successfully", "group": result}
 
 @app.get("/groups/")
+# Returns list of all groups with basic info
 async def read_groups():
     async with app.state.pool.acquire() as conn:
         groups = await list_groups(conn)
     return groups
 
 @app.put("/groups/{group_id}")
-async def update_group_info(
-    group_id: uuid.UUID,
-    name: str = Body(None),
-    current_user: str = Depends(get_current_user)
-):
+async def update_group_info(group_id: uuid.UUID, name: str = Body(None), current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await update_group(conn, group_id, name)
     if result == "UPDATE 0":
@@ -512,10 +507,7 @@ async def update_group_info(
     return {"message": "Group updated successfully"}
 
 @app.delete("/groups/{group_id}")
-async def remove_group(
-    group_id: uuid.UUID,
-    current_user: str = Depends(get_current_user)
-):
+async def remove_group(group_id: uuid.UUID,current_user: str = Depends(get_current_user)):
     async with app.state.pool.acquire() as conn:
         result = await delete_group(conn, group_id)
     if result == "DELETE 0":
@@ -528,6 +520,7 @@ async def remove_group(
 # ----------
 
 @app.post("/groups/{group_id}/members/")
+# Adds a member to the group with role 'Member' by default. Only Leaders can add members.
 async def add_group_member(group_id: uuid.UUID,user_id: uuid.UUID, current_user: str = Depends(get_current_user)):
     """
     Requirement:
@@ -539,6 +532,7 @@ async def add_group_member(group_id: uuid.UUID,user_id: uuid.UUID, current_user:
     return member_added
 
 @app.get("/groups/{group_id}/members/")
+# List all group members
 async def get_group_members(group_id: uuid.UUID):
     async with app.state.pool.acquire() as conn:
         members = await list_group_members(conn, group_id)
@@ -653,11 +647,7 @@ async def health():
 # --------------------
 
 @app.post("/groups/{group_id}/invites/")
-async def send_invite(
-    group_id: uuid.UUID,
-    invitee_id: uuid.UUID,
-    current_user: str = Depends(get_current_user)
-):
+async def send_invite(group_id: uuid.UUID, invitee_id: uuid.UUID,current_user: str = Depends(get_current_user)):
     """
     Leader sends an invite to a user. Fails with 409 if a pending
     invite for this user already exists in this group.
@@ -671,10 +661,7 @@ async def send_invite(
 
 
 @app.get("/groups/{group_id}/invites/")
-async def read_group_invites(
-    group_id: uuid.UUID,
-    current_user: str = Depends(get_current_user)
-):
+async def read_group_invites(group_id: uuid.UUID,current_user: str = Depends(get_current_user)):
     """List all invites for a group."""
     async with app.state.pool.acquire() as conn:
         invites = await list_invites_for_group(conn, group_id)
@@ -692,15 +679,9 @@ async def read_user_invites(user_id: uuid.UUID, current_user: str = Depends(get_
     return invites
 
 
+# Invitee accepts their invite. This adds them to the group_members table with role 'Member'.
 @app.post("/invites/{invite_id}/accept")
-async def accept_invite(
-    invite_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-):
-    """
-    Invitee accepts their invite. Atomically marks the invite as
-    accepted and adds the user to group_members as 'Member'.
-    """
+async def accept_invite(invite_id: uuid.UUID,current_user: str = Depends(get_current_user)):
     user_id = uuid.UUID(str(current_user))
 
     async with app.state.pool.acquire() as conn:
@@ -717,11 +698,7 @@ async def accept_invite(
 
 
 @app.post("/invites/{invite_id}/decline")
-async def decline_invite(
-    invite_id: uuid.UUID,
-    current_user: str = Depends(get_current_user),
-):
-    """Invitee declines their invite."""
+async def decline_invite(invite_id: uuid.UUID,current_user: str = Depends(get_current_user)):
     user_id = uuid.UUID(str(current_user))
 
     async with app.state.pool.acquire() as conn:
@@ -802,4 +779,4 @@ async def get_group_rank(group_id: uuid.UUID):
         if group["group_id"] == str(group_id):
             return {**group, "rank": i, "total_groups": len(ranked)}
 
-    raise HTTPException(404, "Group not found in leaderboard"
+    raise HTTPException (404, "Group not found in leaderboard")
