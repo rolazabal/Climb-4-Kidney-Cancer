@@ -9,13 +9,15 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.SummitSteps",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "Track your climbing progress using Health data",
-        "NSHealthUpdateUsageDescription": "Update climbing stats based on activity"
+        "NSHealthShareUsageDescription": "Allow $(PRODUCT_NAME) to read your health data.",
+        "NSHealthUpdateUsageDescription": "Allow $(PRODUCT_NAME) to update your health data."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true
       }
     },
+    "plugins": ["@kingstinct/react-native-healthkit"],
     "android": {
       "package": "com.anonymous.App"
     },
