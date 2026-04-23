@@ -1,0 +1,6 @@
+USERS_SERVICE_URL = "http://users-service:8000"
+MOUNTAINS_SERVICE_URL = "http://mountains-service:8000"
+PROGRESS_SERVICE_URL = "http://progress-service:8000"
+GROUPS_SERVICE_URL = "http://groups-service:8000"
+EVENTS_SERVICE_URL = "http://events-service:8000"
+AUTH_SERVICE_URL = "http://auth-service:8000"
