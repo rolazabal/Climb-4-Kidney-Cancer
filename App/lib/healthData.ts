@@ -89,74 +89,74 @@ async function recordAndroidElevation(feet: number) {
   ]);
 }
 
-function getAppleHealthKit() {
-  const module = require("react-native-health");
-  return module.default?.initHealthKit ? module.default : module;
-}
+// function getAppleHealthKit() {
+//   const module = require("react-native-health");
+//   return module.default?.initHealthKit ? module.default : module;
+// }
 
-async function readIosElevation(): Promise<HealthDataResult> {
-  try {
-    const AppleHealthKit = getAppleHealthKit();
-    const permissions = {
-      permissions: {
-        read: [AppleHealthKit.Constants.Permissions.FlightsClimbed],
-        write: [],
-      },
-    };
+// async function readIosElevation(): Promise<HealthDataResult> {
+//   try {
+//     const AppleHealthKit = getAppleHealthKit();
+//     const permissions = {
+//       permissions: {
+//         read: [AppleHealthKit.Constants.Permissions.FlightsClimbed],
+//         write: [],
+//       },
+//     };
 
-    await new Promise<void>((resolve, reject) => {
-      AppleHealthKit.initHealthKit(permissions, (error: unknown) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    });
+//     await new Promise<void>((resolve, reject) => {
+//       AppleHealthKit.initHealthKit(permissions, (error: unknown) => {
+//         if (error) {
+//           reject(error);
+//           return;
+//         }
+//         resolve();
+//       });
+//     });
 
-    const { startDate, endDate } = getTodayRange();
-    const results = await new Promise<{ value?: number }>((resolve, reject) => {
-      AppleHealthKit.getFlightsClimbed(
-        {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-        },
-        (error: unknown, value: { value?: number }) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve(value ?? {});
-        }
-      );
-    });
+//     const { startDate, endDate } = getTodayRange();
+//     const results = await new Promise<{ value?: number }>((resolve, reject) => {
+//       AppleHealthKit.getFlightsClimbed(
+//         {
+//           startDate: startDate.toISOString(),
+//           endDate: endDate.toISOString(),
+//         },
+//         (error: unknown, value: { value?: number }) => {
+//           if (error) {
+//             reject(error);
+//             return;
+//           }
+//           resolve(value ?? {});
+//         }
+//       );
+//     });
 
-    return {
-      elevationFt: (results.value ?? 0) * FEET_PER_FLIGHT,
-      permissionGranted: true,
-      provider: "healthkit",
-      supported: true,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Apple Health is unavailable.";
-    return {
-      elevationFt: 0,
-      permissionGranted: false,
-      provider: "healthkit",
-      supported: true,
-      message,
-    };
-  }
-}
+//     return {
+//       elevationFt: (results.value ?? 0) * FEET_PER_FLIGHT,
+//       permissionGranted: true,
+//       provider: "healthkit",
+//       supported: true,
+//     };
+//   } catch (error) {
+//     const message = error instanceof Error ? error.message : "Apple Health is unavailable.";
+//     return {
+//       elevationFt: 0,
+//       permissionGranted: false,
+//       provider: "healthkit",
+//       supported: true,
+//       message,
+//     };
+//   }
+// }
 
 export async function getHealthData(): Promise<HealthDataResult> {
   if (Platform.OS === "android") {
     return readAndroidElevation();
   }
 
-  if (Platform.OS === "ios") {
-    return readIosElevation();
-  }
+  // if (Platform.OS === "ios") {
+  //   return readIosElevation();
+  // }
 
   return {
     elevationFt: 0,
