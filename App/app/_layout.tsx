@@ -97,8 +97,11 @@ function RootLayout() {
       await getPermissions();
       await registerBackgroundTaskAsync();
       await updateAsync();
+      launch.current = true;
     };
-    initTask();
+    if (!launch.current) {
+      initTask();
+    }
     // create listener for change in appState, capture new state in nextAppState
     const subscription = AppState.addEventListener('change', nextAppState => {
       console.log(appState.current);
@@ -107,11 +110,10 @@ function RootLayout() {
       nextAppState === 'active') {
         // app went from background to foreground
         console.log("Welcome back!");
-        launch.current = true;
         dataCollect();
       } else if (launch.current && appState.current === 'active' &&
       nextAppState.match(/inactive|background/)){
-        //console.log("Bye!");
+        console.log("Bye!");
         triggerTask();
       }
       // apply the change

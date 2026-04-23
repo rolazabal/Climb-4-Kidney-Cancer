@@ -6,15 +6,6 @@ import { DeviceType, insertRecords, readRecords, RecordingMethod } from 'react-n
 import { SafeAreaView } from "react-native-safe-area-context";
 import { dataCollect } from '../_layout';
 
-const theme = {
-    primary: 'rgb(51, 51, 51)',
-    secondary: 'rgb(102, 102, 101)',
-    accent: 'rgb(205, 88, 56)',
-    accentDark: 'rgb(185, 68, 36)',
-    background: '#F9FAFB',
-    white: '#FFFFFF',
-};
-
 function Progress() {
 
     const [elevation, setElevation] = useState(0);
@@ -114,7 +105,7 @@ function Progress() {
                         </Text>
                     </View>
                     <View style={{flex: 3, padding: 50}}>
-                        <Text style={[styles.label, {color: theme.accent}]}>
+                        <Text style={[styles.label, {color: THEME_COLORS.accent}]}>
                             {elevation} ft
                         </Text>
                         <Text style={styles.small}>
@@ -146,19 +137,19 @@ const styles = StyleSheet.create({
     },
     small: {
         textAlign: 'center',
-        color: theme.secondary,
+        color: THEME_COLORS.secondary,
         fontSize: 20,
     },
     info: {
         flex: 20,
         padding: 10,
-        backgroundColor: theme.white,
+        backgroundColor: THEME_COLORS.white,
         borderRadius: 10,
 
     },
     card: {
         flex: 1,
-        backgroundColor: theme.white,
+        backgroundColor: THEME_COLORS.white,
         borderRadius: 10,
         justifyContent: 'center',
         marginBottom: 10
@@ -166,14 +157,14 @@ const styles = StyleSheet.create({
     card_head: {
         flex: 1,
         paddingHorizontal: 20,
-        backgroundColor: theme.primary,
+        backgroundColor: THEME_COLORS.primary,
         borderTopStartRadius: 10,
         borderTopEndRadius: 10,
         justifyContent: 'center'
     },
     card_head_text: {
         fontSize: 24,
-        color: theme.white,
+        color: THEME_COLORS.white,
     }
 });
 
